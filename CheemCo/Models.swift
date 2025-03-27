@@ -16,8 +16,7 @@ struct HangoutRequest: Identifiable, Codable {
     let fromUserId: String
     let toPersonaId: String
     let toUserEmail: String
-    let receiverName: String       // Add this field
-    let hangoutType: HangoutType  // Using existing HangoutType
+    let hangoutType: HangoutType
     let proposedTime: Date
     let duration: Double
     let status: RequestStatus

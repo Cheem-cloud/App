@@ -23,13 +23,11 @@ class HangoutRequestService {
             fromUserId: currentUserId,
             toPersonaId: toPersona.id,
             toUserEmail: toPersona.emailOwner,
-            receiverName: toPersona.name,  // Add receiver name
             hangoutType: type,
             proposedTime: time,
             duration: duration,
             status: .pending,
-            timestamp: Date(),
-            message: nil
+            timestamp: Date()
         )
         
         do {
