@@ -18,6 +18,11 @@ class HangoutRequestViewModel: ObservableObject {
     func createHangoutRequest() {
         // TODO: Implement hangout request creation
     }
+    
+    func selectPersonaAndContinue(_ persona: Persona) {
+        selectedPersona = persona
+        // Additional logic for continuing to the next step can be added here
+    }
 }
 
 struct StepIndicator: View {

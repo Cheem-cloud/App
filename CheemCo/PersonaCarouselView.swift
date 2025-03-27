@@ -5,7 +5,7 @@ struct PersonaCarouselView: View {
     
     var body: some View {
         TabView {
-            ForEach(viewModel.availablePersonas) { persona in
+            ForEach(Persona.examples) { persona in
                 VStack {
                     Text(persona.name)
                         .font(.title2)
