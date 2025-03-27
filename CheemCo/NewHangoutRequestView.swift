@@ -4,8 +4,8 @@ import SwiftUI
 
 struct NewHangoutRequestView: View {
     @State private var selectedPersona: Persona?
-    @State private var selectedHangoutType: String = ""
-    @State private var selectedDuration: Int = 60 // Default 60 minutes
+    @State private var selectedHangoutType: HangoutType?
+    @State private var selectedDuration: Double = 1.0 // Default 1 hour
     @State private var selectedTimeSlot: Date?
     @State private var currentStep: Int = 0
     
@@ -20,13 +20,12 @@ struct NewHangoutRequestView: View {
                     currentStep += 1
                 }
             case 1:
-                SelectHangoutTypeView(selectedHangoutType: $selectedHangoutType) {
-                    currentStep += 1
-                }
+                HangoutTypeSelectionView(selectedType: Binding(
+                    get: { selectedHangoutType ?? .hangout },
+                    set: { selectedHangoutType = $0 }
+                ))
             case 2:
-                SelectDurationView(selectedDuration: $selectedDuration) {
-                    currentStep += 1
-                }
+                DurationSelectionView(selectedDuration: $selectedDuration)
             case 3:
                 SelectTimeSlotView(selectedTimeSlot: $selectedTimeSlot) {
                     submitRequest()
@@ -41,101 +40,93 @@ struct NewHangoutRequestView: View {
     }
     
     private func submitRequest() {
-        guard let selectedPersona = selectedPersona, let selectedTimeSlot = selectedTimeSlot else {
+        guard let selectedPersona = selectedPersona,
+              let selectedHangoutType = selectedHangoutType,
+              let selectedTimeSlot = selectedTimeSlot else {
             // Handle error case
             return
         }
         
         let service = HangoutRequestService()
         service.submitHangoutRequest(
-            userId: UserDefaults.standard.string(forKey: "currentUserId") ?? "",
-            personaId: selectedPersona.id,
+            persona: selectedPersona,
             hangoutType: selectedHangoutType,
-            proposedTime: selectedTimeSlot,
-            duration: selectedDuration
+            duration: selectedDuration,
+            proposedTime: selectedTimeSlot
         )
-        
-        // Handle success - navigate back or show confirmation
     }
 }
 
-// Supporting views
 struct SelectPersonaView: View {
     let personas: [Persona]
     @Binding var selectedPersona: Persona?
     let onNext: () -> Void
     
     var body: some View {
-        VStack {
-            Text("Select Persona")
-                .font(.headline)
+        VStack(spacing: 20) {
+            Text("Select a Persona")
+                .font(.title2)
+                .foregroundColor(ThemeColors.textColor)
+                .padding(.bottom)
             
-            // Carousel of personas
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 20) {
-                    ForEach(personas, id: \.id) { persona in
-                        PersonaCard(persona: persona, isSelected: selectedPersona?.id == persona.id)
-                            .onTapGesture {
-                                selectedPersona = persona
-                            }
+            ForEach(personas) { persona in
+                Button {
+                    selectedPersona = persona
+                    onNext()
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text(persona.name)
+                                .font(.headline)
+                            Text(persona.type)
+                                .font(.subheadline)
+                                .foregroundColor(ThemeColors.secondaryText)
+                        }
+                        
+                        Spacer()
+                        
+                        if selectedPersona?.id == persona.id {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(ThemeColors.textColor)
+                        }
                     }
+                    .padding()
+                    .background(selectedPersona?.id == persona.id ? ThemeColors.lightGreen : ThemeColors.darkGreen)
+                    .foregroundColor(ThemeColors.textColor)
+                    .cornerRadius(10)
                 }
-                .padding()
             }
-            
-            Button("Next") {
-                guard selectedPersona != nil else { return }
-                onNext()
-            }
-            .disabled(selectedPersona == nil)
-            .padding()
         }
     }
 }
 
-struct PersonaCard: View {
-    let persona: Persona
-    let isSelected: Bool
+struct SelectTimeSlotView: View {
+    @Binding var selectedTimeSlot: Date?
+    let onSubmit: () -> Void
     
     var body: some View {
         VStack {
-            if let image = persona.image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 100, height: 100)
-                    .clipShape(Circle())
-                    .overlay(
-                        Circle()
-                            .stroke(isSelected ? Color.blue : Color.clear, lineWidth: 3)
-                    )
-            } else {
-                Circle()
-                    .fill(Color.gray)
-                    .frame(width: 100, height: 100)
-                    .overlay(
-                        Circle()
-                            .stroke(isSelected ? Color.blue : Color.clear, lineWidth: 3)
-                    )
+            Text("Select Time Slot")
+                .font(.title2)
+                .foregroundColor(ThemeColors.textColor)
+                .padding(.bottom)
+            
+            // TODO: Implement time slot selection UI
+            
+            Button("Submit") {
+                onSubmit()
             }
-            
-            Text(persona.name)
-                .fontWeight(.medium)
-            
-            Text(persona.description)
-                .font(.caption)
-                .multilineTextAlignment(.center)
+            .padding()
+            .background(ThemeColors.darkGreen)
+            .foregroundColor(.white)
+            .cornerRadius(10)
         }
-        .padding()
-        .background(isSelected ? Color.blue.opacity(0.1) : Color.clear)
-        .cornerRadius(10)
     }
 }
 
 // Placeholder for other supporting views - implement as needed
-struct SelectHangoutTypeView: View {
-    @Binding var selectedHangoutType: String
-    let onNext: () -> Void
+struct HangoutTypeSelectionView: View {
+    @Binding var selectedType: HangoutType
     
     var body: some View {
         // Implementation
@@ -143,23 +134,12 @@ struct SelectHangoutTypeView: View {
     }
 }
 
-struct SelectDurationView: View {
-    @Binding var selectedDuration: Int
-    let onNext: () -> Void
+struct DurationSelectionView: View {
+    @Binding var selectedDuration: Double
     
     var body: some View {
         // Implementation
         Text("Select Duration")
-    }
-}
-
-struct SelectTimeSlotView: View {
-    @Binding var selectedTimeSlot: Date?
-    let onComplete: () -> Void
-    
-    var body: some View {
-        // Implementation
-        Text("Select Time Slot")
     }
 }
 

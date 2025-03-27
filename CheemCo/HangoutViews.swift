@@ -1,33 +1,9 @@
 import SwiftUI
 import UIKit
 
-enum HangoutType: String, CaseIterable {
-    case coffee = "Coffee"
-    case lunch = "Lunch"
-    case dinner = "Dinner"
-    case drinks = "Drinks"
-    case activity = "Activity"
-    
-    var icon: String {
-        switch self {
-        case .coffee: return "cup.and.saucer.fill"
-        case .lunch: return "fork.knife"
-        case .dinner: return "moon.stars.fill"
-        case .drinks: return "wineglass.fill"
-        case .activity: return "figure.run"
-        }
-    }
-    
-    var description: String {
-        switch self {
-        case .coffee: return "Quick coffee and chat"
-        case .lunch: return "Lunch break together"
-        case .dinner: return "Evening dinner"
-        case .drinks: return "Drinks and socializing"
-        case .activity: return "Physical activity together"
-        }
-    }
-}
+// Import Models to resolve ambiguity
+@_exported import struct CheemCo.Persona
+@_exported import enum CheemCo.HangoutType
 
 struct TimeSlotGroup: Identifiable {
     let id = UUID()
@@ -36,7 +12,7 @@ struct TimeSlotGroup: Identifiable {
 }
 
 class HangoutRequestViewModel: ObservableObject {
-    @Published var selectedPersona: CheemCo.Persona?
+    @Published var selectedPersona: Persona?
     @Published var selectedHangoutType: HangoutType?
     @Published var selectedDuration: Double = 1.0
     @Published var selectedTimeSlot: Date?

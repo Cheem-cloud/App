@@ -8,19 +8,23 @@ class HangoutRequestService {
     private let db = Firestore.firestore()
     
     func submitHangoutRequest(
-        userId: String,
-        personaId: String,
-        hangoutType: String,
-        proposedTime: Date,
-        duration: Int
+        persona: Persona,
+        hangoutType: HangoutType,
+        duration: Double,
+        proposedTime: Date
     ) {
+        guard let userId = Auth.auth().currentUser?.uid else {
+            print("Error: No authenticated user")
+            return
+        }
+        
         // Create a dictionary of the request data
         let requestData: [String: Any] = [
             "userId": userId,
-            "personaId": personaId,
-            "hangoutType": hangoutType,
+            "personaId": persona.id,
+            "hangoutType": hangoutType.rawValue,
             "proposedTime": Timestamp(date: proposedTime),
-            "duration": duration,
+            "duration": Int(duration * 60), // Convert hours to minutes
             "status": "pending",
             "createdAt": FieldValue.serverTimestamp()
         ]
@@ -54,7 +58,8 @@ class HangoutRequestService {
                     let data = document.data()
                     
                     guard let personaId = data["personaId"] as? String,
-                          let hangoutType = data["hangoutType"] as? String,
+                          let hangoutTypeString = data["hangoutType"] as? String,
+                          let hangoutType = HangoutType(rawValue: hangoutTypeString),
                           let proposedTimeTimestamp = data["proposedTime"] as? Timestamp,
                           let duration = data["duration"] as? Int,
                           let status = data["status"] as? String else {
@@ -88,12 +93,11 @@ class HangoutRequestService {
     }
 }
 
-// Define the HangoutRequest model
-struct HangoutRequest {
+struct HangoutRequest: Identifiable {
     let id: String
     let userId: String
     let personaId: String
-    let hangoutType: String
+    let hangoutType: HangoutType
     let proposedTime: Date
     let duration: Int
     let status: String

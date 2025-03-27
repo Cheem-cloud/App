@@ -14,12 +14,21 @@ struct Event: Identifiable {
     var createdBy: String
 }
 
+enum EventError: Error {
+    case authenticationFailed
+    case networkError(String)
+    case invalidData
+    case unknown
+}
+
 class EventManager: ObservableObject {
     @Published var events: [Event] = []
     @Published var googleEvents: [GTLRCalendar_Event] = []
     @Published var isGoogleSignedIn: Bool = false
+    @Published var error: EventError?
     private var db = Firestore.firestore()
     private let calendarService = GTLRCalendarService()
+    private let calendar = Calendar.current
     
     init() {
         loadEvents()
@@ -33,11 +42,13 @@ class EventManager: ObservableObject {
                     if let error = error {
                         print("Error restoring Google Sign In: \(error)")
                         self?.isGoogleSignedIn = false
+                        self?.error = .authenticationFailed
                         return
                     }
                     
                     print("Successfully restored Google Sign In")
                     self?.isGoogleSignedIn = true
+                    self?.error = nil
                     self?.loadGoogleCalendarEvents()
                 }
             }
@@ -45,32 +56,47 @@ class EventManager: ObservableObject {
     }
     
     func loadEvents() {
-        guard let userId = Auth.auth().currentUser?.uid else { return }
+        guard let userId = Auth.auth().currentUser?.uid else {
+            error = .authenticationFailed
+            return
+        }
         
         db.collection("events")
             .whereField("createdBy", in: [userId])
-            .addSnapshotListener { querySnapshot, error in
-                guard let documents = querySnapshot?.documents else {
-                    print("No events found")
-                    return
-                }
-                
-                self.events = documents.compactMap { document -> Event? in
-                    let data = document.data()
-                    return Event(
-                        id: document.documentID,
-                        title: data["title"] as? String ?? "",
-                        date: (data["date"] as? Timestamp)?.dateValue() ?? Date(),
-                        duration: data["duration"] as? Double ?? 1.0,
-                        type: data["type"] as? String ?? "",
-                        createdBy: data["createdBy"] as? String ?? ""
-                    )
+            .addSnapshotListener { [weak self] querySnapshot, error in
+                DispatchQueue.main.async {
+                    if let error = error {
+                        print("Error loading events: \(error)")
+                        self?.error = .networkError(error.localizedDescription)
+                        return
+                    }
+                    
+                    guard let documents = querySnapshot?.documents else {
+                        print("No events found")
+                        return
+                    }
+                    
+                    self?.events = documents.compactMap { document -> Event? in
+                        let data = document.data()
+                        return Event(
+                            id: document.documentID,
+                            title: data["title"] as? String ?? "",
+                            date: (data["date"] as? Timestamp)?.dateValue() ?? Date(),
+                            duration: data["duration"] as? Double ?? 1.0,
+                            type: data["type"] as? String ?? "",
+                            createdBy: data["createdBy"] as? String ?? ""
+                        )
+                    }
+                    self?.error = nil
                 }
             }
     }
     
     func addEvent(_ title: String, date: Date, duration: Double, type: String) {
-        guard let userId = Auth.auth().currentUser?.uid else { return }
+        guard let userId = Auth.auth().currentUser?.uid else {
+            error = .authenticationFailed
+            return
+        }
         
         let newEvent = [
             "title": title,
@@ -80,17 +106,27 @@ class EventManager: ObservableObject {
             "createdBy": userId
         ] as [String : Any]
         
-        db.collection("events").addDocument(data: newEvent) { error in
-            if let error = error {
-                print("Error adding event: \(error)")
+        db.collection("events").addDocument(data: newEvent) { [weak self] error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("Error adding event: \(error)")
+                    self?.error = .networkError(error.localizedDescription)
+                } else {
+                    self?.error = nil
+                }
             }
         }
     }
     
     func deleteEvent(_ id: String) {
-        db.collection("events").document(id).delete() { error in
-            if let error = error {
-                print("Error removing event: \(error)")
+        db.collection("events").document(id).delete() { [weak self] error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    print("Error removing event: \(error)")
+                    self?.error = .networkError(error.localizedDescription)
+                } else {
+                    self?.error = nil
+                }
             }
         }
     }
@@ -98,13 +134,14 @@ class EventManager: ObservableObject {
     func loadGoogleCalendarEvents() {
         guard let user = GIDSignIn.sharedInstance.currentUser else {
             print("Not signed in to Google")
+            isGoogleSignedIn = false
+            error = .authenticationFailed
             return
         }
         
         calendarService.authorizer = user.fetcherAuthorizer
         
         let query = GTLRCalendarQuery_EventsList.query(withCalendarId: "primary")
-        let calendar = Calendar.current
         
         query.timeMin = GTLRDateTime(date: Date())
         if let oneMonthFromNow = calendar.date(byAdding: .month, value: 1, to: Date()) {
@@ -120,15 +157,18 @@ class EventManager: ObservableObject {
             DispatchQueue.main.async {
                 if let error = error {
                     print("Error fetching Google Calendar events: \(error)")
+                    self?.error = .networkError(error.localizedDescription)
                     return
                 }
                 
                 guard let eventsList = result as? GTLRCalendar_Events else {
                     print("Could not parse events response")
+                    self?.error = .invalidData
                     return
                 }
                 
                 self?.googleEvents = eventsList.items ?? []
+                self?.error = nil
                 print("Fetched \(eventsList.items?.count ?? 0) Google Calendar events")
             }
         }
@@ -138,6 +178,7 @@ class EventManager: ObservableObject {
         guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
               let window = windowScene.windows.first,
               let rootViewController = window.rootViewController else {
+            error = .unknown
             completion(false)
             return
         }
@@ -151,12 +192,14 @@ class EventManager: ObservableObject {
                 if let error = error {
                     print("Google Sign In Error: \(error)")
                     self?.isGoogleSignedIn = false
+                    self?.error = .authenticationFailed
                     completion(false)
                     return
                 }
                 
                 print("Successfully signed in to Google")
                 self?.isGoogleSignedIn = true
+                self?.error = nil
                 self?.loadGoogleCalendarEvents()
                 completion(true)
             }
@@ -167,10 +210,12 @@ class EventManager: ObservableObject {
         GIDSignIn.sharedInstance.signOut()
         isGoogleSignedIn = false
         googleEvents.removeAll()
+        error = nil
     }
     
     func checkConflicts(for date: Date, duration: Double) -> [(String, Date, String)] {
         let calendar = Calendar.current
+        let timeZone = calendar.timeZone
         
         guard let endDate = calendar.date(byAdding: .minute, value: Int(duration * 60), to: date) else {
             return []
@@ -191,8 +236,12 @@ class EventManager: ObservableObject {
         for event in googleEvents {
             if let start = event.start?.dateTime?.date ?? event.start?.date?.date,
                let end = event.end?.dateTime?.date ?? event.end?.date?.date {
-                if date < end && start < endDate {
-                    conflicts.append((event.summary ?? "Untitled Event", start, "Google Calendar"))
+                // Convert Google Calendar event times to local timezone
+                let localStart = calendar.date(byAdding: .second, value: timeZone.secondsFromGMT(), to: start) ?? start
+                let localEnd = calendar.date(byAdding: .second, value: timeZone.secondsFromGMT(), to: end) ?? end
+                
+                if date < localEnd && localStart < endDate {
+                    conflicts.append((event.summary ?? "Untitled Event", localStart, "Google Calendar"))
                 }
             }
         }
