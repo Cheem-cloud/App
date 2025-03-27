@@ -3,6 +3,7 @@
 import Foundation
 import Firebase
 import FirebaseFirestore
+import FirebaseAuth
 
 class HangoutRequestService {
     private let db = Firestore.firestore()
