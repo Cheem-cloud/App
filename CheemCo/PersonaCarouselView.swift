@@ -4,32 +4,38 @@ struct PersonaCarouselView: View {
     @ObservedObject var viewModel: HangoutRequestViewModel
     
     var body: some View {
-        TabView {
+        VStack(spacing: 20) {
+            Text("Select a Persona")
+                .font(.title2)
+                .foregroundColor(ThemeColors.textColor)
+                .padding(.bottom)
+            
             ForEach(Persona.examples) { persona in
-                VStack {
-                    Text(persona.name)
-                        .font(.title2)
-                    Text(persona.type)
-                        .font(.subheadline)
-                    Text(persona.description)
-                        .multilineTextAlignment(.center)
-                        .padding()
-                    
-                    Button("Select") {
-                        viewModel.selectPersonaAndContinue(persona)
+                Button {
+                    viewModel.selectPersonaAndContinue(persona)
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text(persona.name)
+                                .font(.headline)
+                            Text(persona.type)
+                                .font(.subheadline)
+                                .foregroundColor(ThemeColors.secondaryText)
+                        }
+                        
+                        Spacer()
+                        
+                        if viewModel.selectedPersona?.id == persona.id {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(ThemeColors.textColor)
+                        }
                     }
                     .padding()
-                    .background(ThemeColors.darkGreen)
-                    .foregroundColor(.white)
+                    .background(viewModel.selectedPersona?.id == persona.id ? ThemeColors.lightGreen : ThemeColors.darkGreen)
+                    .foregroundColor(ThemeColors.textColor)
                     .cornerRadius(10)
                 }
-                .padding()
-                .background(Color(.systemBackground))
-                .cornerRadius(15)
-                .shadow(radius: 5)
-                .padding(.horizontal)
             }
         }
-        .tabViewStyle(PageTabViewStyle())
     }
 }
