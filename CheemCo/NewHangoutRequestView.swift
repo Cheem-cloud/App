@@ -74,11 +74,13 @@ struct NewHangoutRequestView: View {
     
     private func submitRequest() {
         guard let persona = selectedPersona,
-              let time = selectedTime else { return }
+              let time = selectedTime,
+              let hangoutType = viewModel.selectedHangoutType else { return }
         
-        viewModel.submitHangoutRequest(
+        let service = HangoutRequestService()
+        service.submitHangoutRequest(
             persona: persona,
-            hangoutType: viewModel.selectedHangoutType,
+            hangoutType: hangoutType,
             duration: viewModel.selectedDuration,
             proposedTime: time
         )
