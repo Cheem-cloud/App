@@ -3,57 +3,87 @@
 import SwiftUI
 
 struct NewHangoutRequestView: View {
+    @Environment(\.dismiss) private var dismiss
+    @StateObject private var viewModel = HangoutRequestViewModel()
+    @State private var currentStep = 1
     @State private var selectedPersona: Persona?
-    @State private var selectedHangoutType: HangoutType?
-    @State private var selectedDuration: Double = 1.0 // Default 1 hour
-    @State private var selectedTimeSlot: Date?
-    @State private var currentStep: Int = 0
-    
-    // Make sure we're using the examples property correctly
-    private let personas = Persona.examples
+    @State private var selectedTime: Date?
     
     var body: some View {
-        VStack {
-            switch currentStep {
-            case 0:
-                SelectPersonaView(personas: personas, selectedPersona: $selectedPersona) {
-                    currentStep += 1
+        NavigationStack {
+            ZStack {
+                ThemeColors.backgroundGradient
+                    .ignoresSafeArea()
+                
+                VStack {
+                    StepIndicatorView(currentStep: currentStep, totalSteps: 3)
+                        .padding(.top)
+                    
+                    ScrollView {
+                        VStack(spacing: 20) {
+                            switch currentStep {
+                            case 1:
+                                PersonaCarouselView(viewModel: viewModel)
+                            case 2:
+                                DurationSelectionView(selectedDuration: $viewModel.selectedDuration)
+                            case 3:
+                                TimeSlotPickerView(viewModel: viewModel, selectedTime: $selectedTime)
+                            default:
+                                EmptyView()
+                            }
+                        }
+                        .padding()
+                    }
                 }
-            case 1:
-                HangoutTypeSelectionView(selectedType: Binding(
-                    get: { selectedHangoutType ?? .hangout },
-                    set: { selectedHangoutType = $0 }
-                ))
-            case 2:
-                DurationSelectionView(selectedDuration: $selectedDuration)
-            case 3:
-                SelectTimeSlotView(selectedTimeSlot: $selectedTimeSlot) {
-                    submitRequest()
-                }
-            default:
-                Text("Invalid step")
             }
-            
-            StepIndicatorView(currentStep: currentStep, totalSteps: 4)
+            .navigationTitle("New Hangout Request")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(ThemeColors.darkGreen, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    if currentStep > 1 {
+                        Button("Back") {
+                            withAnimation {
+                                currentStep -= 1
+                            }
+                        }
+                        .foregroundColor(ThemeColors.textColor)
+                    }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    if currentStep < 3 {
+                        Button("Next") {
+                            withAnimation {
+                                currentStep += 1
+                            }
+                        }
+                        .foregroundColor(ThemeColors.textColor)
+                    } else {
+                        Button("Submit") {
+                            submitRequest()
+                        }
+                        .disabled(selectedTime == nil)
+                        .foregroundColor(ThemeColors.textColor)
+                    }
+                }
+            }
         }
-        .navigationTitle("New Hangout Request")
     }
     
     private func submitRequest() {
-        guard let selectedPersona = selectedPersona,
-              let selectedHangoutType = selectedHangoutType,
-              let selectedTimeSlot = selectedTimeSlot else {
-            // Handle error case
-            return
-        }
+        guard let persona = selectedPersona,
+              let time = selectedTime else { return }
         
-        let service = HangoutRequestService()
-        service.submitHangoutRequest(
-            persona: selectedPersona,
-            hangoutType: selectedHangoutType,
-            duration: selectedDuration,
-            proposedTime: selectedTimeSlot
+        viewModel.submitHangoutRequest(
+            persona: persona,
+            hangoutType: viewModel.selectedHangoutType,
+            duration: viewModel.selectedDuration,
+            proposedTime: time
         )
+        
+        dismiss()
     }
 }
 
