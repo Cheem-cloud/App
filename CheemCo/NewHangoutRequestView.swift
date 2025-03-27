@@ -1,251 +1,196 @@
 import SwiftUI
+import Foundation
 
-struct StepIndicator: View {
-    @Binding var currentStep: Int
-    let steps = [
-        "Persona",
-        "Type",
-        "Duration",
-        "Time"
-    ]
+class HangoutRequestViewModel: ObservableObject {
+    @Published var currentStep = 1
+    @Published var selectedPersona: Persona?
+    @Published var hangoutType: HangoutType = .hangout
+    @Published var duration: Double = 1.0
+    @Published var selectedTime: Date?
+    @Published var timeSlots: [GoogleCalendarService.DayTimeSlots] = []
+    @Published var isLoadingTimeSlots = false
+    @Published var availablePersonas: [Persona] = []
+    @Published var showingError = false
+    @Published var errorMessage = ""
     
-    var body: some View {
-        VStack(spacing: 8) {
-            HStack {
-                ForEach(0..<steps.count, id: \.self) { index in
-                    Circle()
-                        .fill(index + 1 <= currentStep ? ThemeColors.textColor : ThemeColors.secondaryText)
-                        .frame(width: 12, height: 12)
-                        .overlay(
-                            Circle()
-                                .stroke(ThemeColors.textColor, lineWidth: index + 1 == currentStep ? 2 : 0)
-                        )
-                        .animation(.easeInOut(duration: 0.3), value: currentStep)
-                    
-                    if index < steps.count - 1 {
-                        Rectangle()
-                            .fill(index + 1 < currentStep ? ThemeColors.textColor : ThemeColors.secondaryText)
-                            .frame(height: 2)
-                            .animation(.easeInOut(duration: 0.3), value: currentStep)
-                    }
-                }
-            }
-            
-            HStack {
-                ForEach(0..<steps.count, id: \.self) { index in
-                    Text(steps[index])
-                        .font(.caption)
-                        .foregroundColor(index + 1 == currentStep ? ThemeColors.textColor : ThemeColors.secondaryText)
-                        .frame(maxWidth: .infinity)
-                        .animation(.easeInOut(duration: 0.3), value: currentStep)
-                }
-            }
-        }
-        .padding(.horizontal)
-        .padding(.vertical, 8)
-        .background(ThemeColors.darkGreen.opacity(0.3))
-        .cornerRadius(12)
+    init() {
+        self.availablePersonas = Persona.examples
     }
-}
-
-struct HangoutTypeSelectionView: View {
-    @Binding var selectedType: HangoutType
     
-    var body: some View {
-        VStack(spacing: 20) {
-            Text("What type of hangout?")
-                .font(.title2)
-                .foregroundColor(ThemeColors.textColor)
-                .padding(.bottom)
-            
-            ForEach(HangoutType.allCases, id: \.self) { type in
-                Button {
-                    selectedType = type
-                } label: {
-                    HStack {
-                        Image(systemName: type.icon)
-                            .font(.title2)
-                        
-                        VStack(alignment: .leading) {
-                            Text(type.rawValue)
-                                .font(.headline)
-                            Text(type.description)
-                                .font(.subheadline)
-                                .opacity(0.8)
-                        }
-                        
-                        Spacer()
-                        
-                        if type == selectedType {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(ThemeColors.textColor)
-                        }
-                    }
-                    .padding()
-                    .background(type == selectedType ? ThemeColors.lightGreen : ThemeColors.darkGreen)
-                    .foregroundColor(ThemeColors.textColor)
-                    .cornerRadius(10)
+    var canProceedToNextStep: Bool {
+        switch currentStep {
+        case 1: return selectedPersona != nil
+        case 2: return true // Type is always selected
+        case 3: return true // Duration is always set
+        case 4: return selectedTime != nil
+        default: return false
+        }
+    }
+    
+    func selectPersonaAndContinue(_ persona: Persona) {
+        self.selectedPersona = persona
+        withAnimation {
+            self.currentStep += 1
+        }
+    }
+    
+    func handleBack() {
+        if currentStep > 1 {
+            currentStep -= 1
+        }
+    }
+    
+    func handleNext() {
+        if currentStep < 4 && canProceedToNextStep {
+            if currentStep == 2 {
+                loadTimeSlots()
+            }
+            currentStep += 1
+        }
+    }
+    
+    func loadTimeSlots() {
+        guard let persona = selectedPersona else { return }
+        
+        print("🔄 Loading time slots for \(persona.emailOwner) with duration: \(duration) hours")
+        isLoadingTimeSlots = true
+        
+        GoogleCalendarService.shared.getAvailableTimeSlots(
+            forEmail: persona.emailOwner,
+            requestedDuration: duration
+        ) { [weak self] result in
+            DispatchQueue.main.async {
+                self?.isLoadingTimeSlots = false
+                
+                switch result {
+                case .success(let availableSlots):
+                    print("✅ Received \(availableSlots.count) days with slots")
+                    self?.timeSlots = availableSlots
+                case .failure(let error):
+                    print("❌ Error loading time slots: \(error)")
+                    self?.timeSlots = []
+                    self?.showingError = true
+                    self?.errorMessage = error.localizedDescription
                 }
             }
         }
     }
-}
-
-struct DurationSelectionView: View {
-    @Binding var selectedDuration: Double
     
-    let durations = [
-        (0.5, "30 minutes"),
-        (1.0, "1 hour"),
-        (1.5, "1.5 hours"),
-        (2.0, "2 hours"),
-        (3.0, "3 hours")
-    ]
-    
-    var body: some View {
-        VStack(spacing: 20) {
-            Text("How long would you like?")
-                .font(.title2)
-                .foregroundColor(ThemeColors.textColor)
-                .padding(.bottom)
-            
-            ForEach(durations, id: \.0) { duration in
-                Button {
-                    selectedDuration = duration.0
-                } label: {
-                    HStack {
-                        Image(systemName: "clock")
-                            .font(.title2)
-                        
-                        Text(duration.1)
-                            .font(.headline)
-                        
-                        Spacer()
-                        
-                        if selectedDuration == duration.0 {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(ThemeColors.textColor)
-                        }
-                    }
-                    .padding()
-                    .background(selectedDuration == duration.0 ? ThemeColors.lightGreen : ThemeColors.darkGreen)
-                    .foregroundColor(ThemeColors.textColor)
-                    .cornerRadius(10)
+    func submitRequest(dismiss: @escaping () -> Void) {
+        guard let persona = selectedPersona,
+              let selectedTime = selectedTime else {
+            showingError = true
+            errorMessage = "Missing required information"
+            return
+        }
+        
+        HangoutRequestService.shared.submitRequest(
+            fromPersona: persona,  // Update this based on current user's persona
+            toPersona: persona,
+            type: hangoutType,
+            time: selectedTime
+        ) { [weak self] result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success:
+                    print("✅ Request submitted successfully")
+                    dismiss()
+                case .failure(let error):
+                    print("❌ Failed to submit request: \(error)")
+                    self?.showingError = true
+                    self?.errorMessage = error.localizedDescription
                 }
             }
         }
     }
 }
 
-struct TimeSlotSelectionView: View {
-    @ObservedObject var viewModel: HangoutRequestViewModel
-    @Binding var selectedTime: Date?
-    
-    private let timeFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.timeStyle = .short
-        return formatter
-    }()
-    
-    private let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        return formatter
-    }()
+struct NewHangoutRequestView: View {
+    @StateObject private var viewModel = HangoutRequestViewModel()
+    @Environment(\.dismiss) private var dismiss
     
     var body: some View {
-        VStack(spacing: 20) {
-            Text("Available Times")
-                .font(.title2)
-                .foregroundColor(ThemeColors.textColor)
-                .padding(.bottom)
-            
-            if viewModel.isLoadingTimeSlots {
-                ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle(tint: ThemeColors.darkGreen))
-            } else if viewModel.timeSlots.isEmpty {
+        NavigationStack {
+            ZStack {
+                ThemeColors.backgroundGradient
+                    .ignoresSafeArea()
+                
                 VStack {
-                    Image(systemName: "calendar.badge.exclamationmark")
-                        .font(.largeTitle)
-                        .foregroundColor(ThemeColors.secondaryText)
-                    Text("No available times found")
-                        .foregroundColor(ThemeColors.secondaryText)
-                        .padding(.top)
-                }
-                .padding()
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 20, pinnedViews: .sectionHeaders) {
-                        ForEach(viewModel.timeSlots, id: \.date) { daySlots in
-                            Section(header: dayHeader(for: daySlots.date)) {
-                                ForEach(daySlots.slots, id: \.self) { slot in
-                                    TimeSlotButton(
-                                        time: slot,
-                                        duration: viewModel.duration,
-                                        isSelected: selectedTime == slot,
-                                        onSelect: { selectedTime = slot }
-                                    )
+                    // Step indicator
+                    StepIndicator(currentStep: $viewModel.currentStep)
+                        .padding()
+                    
+                    // Current step view
+                    Group {
+                        switch viewModel.currentStep {
+                        case 1:
+                            PersonaCarouselView(viewModel: viewModel)
+                        case 2:
+                            HangoutTypeSelectionView(selectedType: $viewModel.hangoutType)
+                        case 3:
+                            DurationSelectionView(selectedDuration: $viewModel.duration)
+                        case 4:
+                            TimeSlotSelectionView(viewModel: viewModel, selectedTime: $viewModel.selectedTime)
+                        default:
+                            EmptyView()
+                        }
+                    }
+                    .padding()
+                    
+                    Spacer()
+                    
+                    // Navigation buttons
+                    HStack {
+                        if viewModel.currentStep > 1 {
+                            Button("Back") {
+                                withAnimation {
+                                    viewModel.handleBack()
                                 }
                             }
+                            .foregroundColor(ThemeColors.textColor)
+                        }
+                        
+                        Spacer()
+                        
+                        if viewModel.currentStep < 4 {
+                            Button("Next") {
+                                withAnimation {
+                                    viewModel.handleNext()
+                                }
+                            }
+                            .foregroundColor(ThemeColors.textColor)
+                            .disabled(!viewModel.canProceedToNextStep)
+                        } else {
+                            Button("Submit") {
+                                withAnimation {
+                                    viewModel.submitRequest(dismiss: { dismiss() })
+                                }
+                            }
+                            .foregroundColor(ThemeColors.textColor)
+                            .disabled(!viewModel.canProceedToNextStep)
                         }
                     }
+                    .padding()
                 }
             }
-        }
-    }
-    
-    private func dayHeader(for date: Date) -> some View {
-        Text(dateFormatter.string(from: date))
-            .font(.headline)
-            .foregroundColor(ThemeColors.textColor)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.vertical, 8)
-            .padding(.horizontal)
-            .background(ThemeColors.darkGreen)
-    }
-}
-
-struct TimeSlotButton: View {
-    let time: Date
-    let duration: Double
-    let isSelected: Bool
-    let onSelect: () -> Void
-    
-    private let timeFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.timeStyle = .short
-        return formatter
-    }()
-    
-    var body: some View {
-        Button(action: onSelect) {
-            HStack {
-                VStack(alignment: .leading) {
-                    Text(timeFormatter.string(from: time))
-                        .font(.headline)
-                    
-                    if let endTime = Calendar.current.date(
-                        byAdding: .minute,
-                        value: Int(duration * 60),
-                        to: time
-                    ) {
-                        Text("Until \(timeFormatter.string(from: endTime))")
-                            .font(.subheadline)
-                            .foregroundColor(ThemeColors.secondaryText)
+            .navigationTitle("New Hangout")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(ThemeColors.darkGreen, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
                     }
-                }
-                
-                Spacer()
-                
-                if isSelected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(ThemeColors.textColor)
+                    .foregroundColor(.white)
                 }
             }
-            .padding()
-            .background(isSelected ? ThemeColors.lightGreen : ThemeColors.darkGreen)
-            .foregroundColor(ThemeColors.textColor)
-            .cornerRadius(10)
+            .alert("Error", isPresented: $viewModel.showingError) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(viewModel.errorMessage)
+            }
         }
     }
 }

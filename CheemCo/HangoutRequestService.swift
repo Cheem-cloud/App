@@ -7,10 +7,10 @@ class HangoutRequestService {
     private let db = Firestore.firestore()
     
     func submitRequest(
+        fromPersona: Persona,
         toPersona: Persona,
-        type: HangoutType,
+        type: HangoutRequest.HangoutType,
         time: Date,
-        duration: Double,
         completion: @escaping (Result<Void, Error>) -> Void
     ) {
         guard let currentUserId = Auth.auth().currentUser?.uid else {
@@ -20,12 +20,12 @@ class HangoutRequestService {
         
         let request = HangoutRequest(
             id: UUID().uuidString,
-            fromUserId: currentUserId,
-            toPersonaId: toPersona.id,
-            toUserEmail: toPersona.emailOwner,
-            hangoutType: type,
-            proposedTime: time,
-            duration: duration,
+            requesterId: currentUserId,
+            requesterName: fromPersona.name,
+            receiverId: toPersona.id,
+            receiverName: toPersona.name,
+            type: type,
+            time: time,
             status: .pending,
             timestamp: Date()
         )
