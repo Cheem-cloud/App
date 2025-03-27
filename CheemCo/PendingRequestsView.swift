@@ -175,7 +175,7 @@ struct RequestCard: View {
         .padding(.vertical, 8)
     }
     
-    private func typeIcon(for type: HangoutRequest.HangoutType) -> String {
+    private func typeIcon(for type: HangoutType) -> String {
         switch type {
         case .hangout: return "person.2.fill"
         case .walk: return "figure.walk"
