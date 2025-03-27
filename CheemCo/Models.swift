@@ -11,6 +11,26 @@ struct Persona: Identifiable, Codable {
     var preferredActivities: [String]
 }
 
+struct HangoutRequest: Identifiable, Codable {
+    let id: String
+    let fromUserId: String
+    let toPersonaId: String
+    let toUserEmail: String
+    let receiverName: String       // Add this field
+    let hangoutType: HangoutType  // Using existing HangoutType
+    let proposedTime: Date
+    let duration: Double
+    let status: RequestStatus
+    let timestamp: Date
+    var message: String?
+    
+    enum RequestStatus: String, Codable {
+        case pending
+        case accepted
+        case declined
+    }
+}
+
 enum HangoutType: String, Codable, CaseIterable {
     case hangout = "Hangout"
     case walk = "Walk"

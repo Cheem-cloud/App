@@ -3,21 +3,39 @@ import SwiftUI
 // MARK: - View Models
 class HangoutRequestViewModel: ObservableObject {
     @Published var currentStep = 1
+    @Published var selectedPersona: Persona?
     @Published var hangoutType: HangoutType = .hangout
     @Published var duration: Double = 1.0
     @Published var selectedTime: Date?
-    @Published var selectedPersona: Persona?
-    @Published var availablePersonas: [Persona] = []
-    @Published var timeSlots: [DayTimeSlots] = []
+    @Published var timeSlots: [GoogleCalendarService.DayTimeSlots] = [] // Use GoogleCalendarService.DayTimeSlots
     @Published var isLoadingTimeSlots = false
+    @Published var availablePersonas: [Persona] = Persona.examples
+    @Published var showingError = false
+    @Published var errorMessage = ""
     
-    var canProceedToNextStep: Bool {
-        switch currentStep {
-        case 1: return true // Type is always selected
-        case 2: return true // Duration is always set
-        case 3: return selectedTime != nil
-        case 4: return selectedPersona != nil
-        default: return false
+    func submitRequest(dismiss: @escaping () -> Void) {  // Add dismiss parameter
+        guard let persona = selectedPersona,
+              let selectedTime = selectedTime else {
+            return
+        }
+        
+        HangoutRequestService.shared.submitRequest(
+            toPersona: persona,
+            type: hangoutType,
+            time: selectedTime,
+            duration: duration
+        ) { [weak self] result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success:
+                    print("✅ Request submitted successfully")
+                    dismiss()  // Call the dismiss function
+                case .failure(let error):
+                    print("❌ Failed to submit request: \(error)")
+                    self?.showingError = true
+                    self?.errorMessage = error.localizedDescription
+                }
+            }
         }
     }
     
@@ -116,8 +134,29 @@ class HangoutRequestViewModel: ObservableObject {
     }
     
     func submitRequest() {
-        // We'll implement this later
-        print("Submitting request...")
+        guard let persona = selectedPersona,
+              let selectedTime = selectedTime else {
+            return
+        }
+        
+        HangoutRequestService.shared.submitRequest(
+            toPersona: persona,
+            type: hangoutType,
+            time: selectedTime,
+            duration: duration,
+            message: nil  // You could add a message field to your UI if desired
+        ) { [weak self] result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success:
+                    print("✅ Request submitted successfully")
+                    self?.dismiss()  // Or show success message
+                case .failure(let error):
+                    print("❌ Failed to submit request: \(error)")
+                    // Show error to user
+                }
+            }
+        }
     }
 }
 
@@ -394,7 +433,6 @@ struct TimeSlotButton: View {
 struct NewHangoutRequestView: View {
     @StateObject private var viewModel = HangoutRequestViewModel()
     @Environment(\.dismiss) private var dismiss
-    @Namespace private var animation
     
     var body: some View {
         NavigationStack {
@@ -470,10 +508,10 @@ struct NewHangoutRequestView: View {
                             .disabled(!viewModel.canProceedToNextStep)
                         } else {
                             Button("Submit") {
-                                withAnimation {
-                                    viewModel.submitRequest()
-                                }
-                            }
+                                       withAnimation {
+                                           viewModel.submitRequest(dismiss: { dismiss() })
+                                       }
+                                   }
                             .foregroundColor(ThemeColors.textColor)
                             .disabled(!viewModel.canProceedToNextStep)
                         }
