@@ -34,3 +34,36 @@ enum HangoutType: String, Codable, CaseIterable {
     }
 }
 
+// Add this extension to your existing Persona struct
+extension Persona {
+    static let examples = [
+        Persona(
+            id: "1",
+            emailOwner: "kendall.m.crocker@gmail.com",
+            name: "Tennis Pro Kendall",
+            type: "Tennis Pro",
+            description: "Professional tennis player and instructor",
+            interests: ["Tennis", "Fitness", "Competition"],
+            preferredActivities: ["Tennis Match", "Training Session"]
+        ),
+        Persona(
+            id: "2",
+            emailOwner: "kendall.m.crocker@gmail.com",
+            name: "Business Kendall",
+            type: "Business Woman",
+            description: "Corporate executive and mentor",
+            interests: ["Business", "Networking", "Leadership"],
+            preferredActivities: ["Coffee Meeting", "Lunch", "Mentoring"]
+        ),
+        Persona(
+            id: "3",
+            emailOwner: "kendall.m.crocker@gmail.com",
+            name: "Hiker Kendall",
+            type: "Outdoor Enthusiast",
+            description: "Adventure seeker and nature lover",
+            interests: ["Hiking", "Photography", "Nature"],
+            preferredActivities: ["Trail Hiking", "Nature Walk", "Photography"]
+        )
+    ]
+}
+

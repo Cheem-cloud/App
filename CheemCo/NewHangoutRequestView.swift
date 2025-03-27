@@ -1,196 +1,186 @@
-import SwiftUI
-import Foundation
+// NewHangoutRequestView.swift
 
-class HangoutRequestViewModel: ObservableObject {
-    @Published var currentStep = 1
-    @Published var selectedPersona: Persona?
-    @Published var hangoutType: HangoutType = .hangout
-    @Published var duration: Double = 1.0
-    @Published var selectedTime: Date?
-    @Published var timeSlots: [GoogleCalendarService.DayTimeSlots] = []
-    @Published var isLoadingTimeSlots = false
-    @Published var availablePersonas: [Persona] = []
-    @Published var showingError = false
-    @Published var errorMessage = ""
+import SwiftUI
+
+struct NewHangoutRequestView: View {
+    @State private var selectedPersona: Persona?
+    @State private var selectedHangoutType: String = ""
+    @State private var selectedDuration: Int = 60 // Default 60 minutes
+    @State private var selectedTimeSlot: Date?
+    @State private var currentStep: Int = 0
     
-    init() {
-        self.availablePersonas = Persona.examples
-    }
+    // Make sure we're using the examples property correctly
+    private let personas = Persona.examples
     
-    var canProceedToNextStep: Bool {
-        switch currentStep {
-        case 1: return selectedPersona != nil
-        case 2: return true // Type is always selected
-        case 3: return true // Duration is always set
-        case 4: return selectedTime != nil
-        default: return false
-        }
-    }
-    
-    func selectPersonaAndContinue(_ persona: Persona) {
-        self.selectedPersona = persona
-        withAnimation {
-            self.currentStep += 1
-        }
-    }
-    
-    func handleBack() {
-        if currentStep > 1 {
-            currentStep -= 1
-        }
-    }
-    
-    func handleNext() {
-        if currentStep < 4 && canProceedToNextStep {
-            if currentStep == 2 {
-                loadTimeSlots()
-            }
-            currentStep += 1
-        }
-    }
-    
-    func loadTimeSlots() {
-        guard let persona = selectedPersona else { return }
-        
-        print("🔄 Loading time slots for \(persona.emailOwner) with duration: \(duration) hours")
-        isLoadingTimeSlots = true
-        
-        GoogleCalendarService.shared.getAvailableTimeSlots(
-            forEmail: persona.emailOwner,
-            requestedDuration: duration
-        ) { [weak self] result in
-            DispatchQueue.main.async {
-                self?.isLoadingTimeSlots = false
-                
-                switch result {
-                case .success(let availableSlots):
-                    print("✅ Received \(availableSlots.count) days with slots")
-                    self?.timeSlots = availableSlots
-                case .failure(let error):
-                    print("❌ Error loading time slots: \(error)")
-                    self?.timeSlots = []
-                    self?.showingError = true
-                    self?.errorMessage = error.localizedDescription
+    var body: some View {
+        VStack {
+            switch currentStep {
+            case 0:
+                SelectPersonaView(personas: personas, selectedPersona: $selectedPersona) {
+                    currentStep += 1
                 }
+            case 1:
+                SelectHangoutTypeView(selectedHangoutType: $selectedHangoutType) {
+                    currentStep += 1
+                }
+            case 2:
+                SelectDurationView(selectedDuration: $selectedDuration) {
+                    currentStep += 1
+                }
+            case 3:
+                SelectTimeSlotView(selectedTimeSlot: $selectedTimeSlot) {
+                    submitRequest()
+                }
+            default:
+                Text("Invalid step")
             }
+            
+            StepIndicatorView(currentStep: currentStep, totalSteps: 4)
         }
+        .navigationTitle("New Hangout Request")
     }
     
-    func submitRequest(dismiss: @escaping () -> Void) {
-        guard let persona = selectedPersona,
-              let selectedTime = selectedTime else {
-            showingError = true
-            errorMessage = "Missing required information"
+    private func submitRequest() {
+        guard let selectedPersona = selectedPersona, let selectedTimeSlot = selectedTimeSlot else {
+            // Handle error case
             return
         }
         
-        HangoutRequestService.shared.submitRequest(
-            fromPersona: persona,  // Update this based on current user's persona
-            toPersona: persona,
-            type: hangoutType,
-            time: selectedTime
-        ) { [weak self] result in
-            DispatchQueue.main.async {
-                switch result {
-                case .success:
-                    print("✅ Request submitted successfully")
-                    dismiss()
-                case .failure(let error):
-                    print("❌ Failed to submit request: \(error)")
-                    self?.showingError = true
-                    self?.errorMessage = error.localizedDescription
+        let service = HangoutRequestService()
+        service.submitHangoutRequest(
+            userId: UserDefaults.standard.string(forKey: "currentUserId") ?? "",
+            personaId: selectedPersona.id,
+            hangoutType: selectedHangoutType,
+            proposedTime: selectedTimeSlot,
+            duration: selectedDuration
+        )
+        
+        // Handle success - navigate back or show confirmation
+    }
+}
+
+// Supporting views
+struct SelectPersonaView: View {
+    let personas: [Persona]
+    @Binding var selectedPersona: Persona?
+    let onNext: () -> Void
+    
+    var body: some View {
+        VStack {
+            Text("Select Persona")
+                .font(.headline)
+            
+            // Carousel of personas
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 20) {
+                    ForEach(personas, id: \.id) { persona in
+                        PersonaCard(persona: persona, isSelected: selectedPersona?.id == persona.id)
+                            .onTapGesture {
+                                selectedPersona = persona
+                            }
+                    }
                 }
+                .padding()
+            }
+            
+            Button("Next") {
+                guard selectedPersona != nil else { return }
+                onNext()
+            }
+            .disabled(selectedPersona == nil)
+            .padding()
+        }
+    }
+}
+
+struct PersonaCard: View {
+    let persona: Persona
+    let isSelected: Bool
+    
+    var body: some View {
+        VStack {
+            if let image = persona.image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 100, height: 100)
+                    .clipShape(Circle())
+                    .overlay(
+                        Circle()
+                            .stroke(isSelected ? Color.blue : Color.clear, lineWidth: 3)
+                    )
+            } else {
+                Circle()
+                    .fill(Color.gray)
+                    .frame(width: 100, height: 100)
+                    .overlay(
+                        Circle()
+                            .stroke(isSelected ? Color.blue : Color.clear, lineWidth: 3)
+                    )
+            }
+            
+            Text(persona.name)
+                .fontWeight(.medium)
+            
+            Text(persona.description)
+                .font(.caption)
+                .multilineTextAlignment(.center)
+        }
+        .padding()
+        .background(isSelected ? Color.blue.opacity(0.1) : Color.clear)
+        .cornerRadius(10)
+    }
+}
+
+// Placeholder for other supporting views - implement as needed
+struct SelectHangoutTypeView: View {
+    @Binding var selectedHangoutType: String
+    let onNext: () -> Void
+    
+    var body: some View {
+        // Implementation
+        Text("Select Hangout Type")
+    }
+}
+
+struct SelectDurationView: View {
+    @Binding var selectedDuration: Int
+    let onNext: () -> Void
+    
+    var body: some View {
+        // Implementation
+        Text("Select Duration")
+    }
+}
+
+struct SelectTimeSlotView: View {
+    @Binding var selectedTimeSlot: Date?
+    let onComplete: () -> Void
+    
+    var body: some View {
+        // Implementation
+        Text("Select Time Slot")
+    }
+}
+
+struct StepIndicatorView: View {
+    let currentStep: Int
+    let totalSteps: Int
+    
+    var body: some View {
+        // Implementation
+        HStack {
+            ForEach(0..<totalSteps, id: \.self) { step in
+                Circle()
+                    .fill(step <= currentStep ? Color.blue : Color.gray)
+                    .frame(width: 10, height: 10)
             }
         }
     }
 }
 
-struct NewHangoutRequestView: View {
-    @StateObject private var viewModel = HangoutRequestViewModel()
-    @Environment(\.dismiss) private var dismiss
-    
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                ThemeColors.backgroundGradient
-                    .ignoresSafeArea()
-                
-                VStack {
-                    // Step indicator
-                    StepIndicator(currentStep: $viewModel.currentStep)
-                        .padding()
-                    
-                    // Current step view
-                    Group {
-                        switch viewModel.currentStep {
-                        case 1:
-                            PersonaCarouselView(viewModel: viewModel)
-                        case 2:
-                            HangoutTypeSelectionView(selectedType: $viewModel.hangoutType)
-                        case 3:
-                            DurationSelectionView(selectedDuration: $viewModel.duration)
-                        case 4:
-                            TimeSlotSelectionView(viewModel: viewModel, selectedTime: $viewModel.selectedTime)
-                        default:
-                            EmptyView()
-                        }
-                    }
-                    .padding()
-                    
-                    Spacer()
-                    
-                    // Navigation buttons
-                    HStack {
-                        if viewModel.currentStep > 1 {
-                            Button("Back") {
-                                withAnimation {
-                                    viewModel.handleBack()
-                                }
-                            }
-                            .foregroundColor(ThemeColors.textColor)
-                        }
-                        
-                        Spacer()
-                        
-                        if viewModel.currentStep < 4 {
-                            Button("Next") {
-                                withAnimation {
-                                    viewModel.handleNext()
-                                }
-                            }
-                            .foregroundColor(ThemeColors.textColor)
-                            .disabled(!viewModel.canProceedToNextStep)
-                        } else {
-                            Button("Submit") {
-                                withAnimation {
-                                    viewModel.submitRequest(dismiss: { dismiss() })
-                                }
-                            }
-                            .foregroundColor(ThemeColors.textColor)
-                            .disabled(!viewModel.canProceedToNextStep)
-                        }
-                    }
-                    .padding()
-                }
-            }
-            .navigationTitle("New Hangout")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(ThemeColors.darkGreen, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .foregroundColor(.white)
-                }
-            }
-            .alert("Error", isPresented: $viewModel.showingError) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                Text(viewModel.errorMessage)
-            }
-        }
+struct NewHangoutRequestView_Previews: PreviewProvider {
+    static var previews: some View {
+        NewHangoutRequestView()
     }
 }
