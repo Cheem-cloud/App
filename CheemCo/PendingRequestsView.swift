@@ -5,52 +5,79 @@ import GoogleAPIClientForREST_Calendar
 
 class PendingRequestsViewModel: ObservableObject {
     @Published var pendingRequests: [HangoutRequest] = []
-    private var db = Firestore.firestore()
+    @Published var isLoading = false
+    @Published var error: Error?
+    
+    private let db = Firestore.firestore()
     
     init() {
         loadPendingRequests()
     }
     
     func loadPendingRequests() {
-        guard let currentUserId = Auth.auth().currentUser?.uid else { return }
+        isLoading = true
         
         db.collection("hangoutRequests")
-            .whereField("receiverId", isEqualTo: currentUserId)
             .whereField("status", isEqualTo: "pending")
+            .order(by: "timestamp", descending: true)
             .addSnapshotListener { [weak self] querySnapshot, error in
-                guard let documents = querySnapshot?.documents else {
-                    print("No pending requests found")
+                guard let self = self else { return }
+                self.isLoading = false
+                
+                if let error = error {
+                    self.error = error
                     return
                 }
                 
-                self?.pendingRequests = documents.compactMap { document -> HangoutRequest? in
-                    try? document.data(as: HangoutRequest.self)
+                guard let documents = querySnapshot?.documents else {
+                    self.pendingRequests = []
+                    return
                 }
-                .sorted { $0.timestamp > $1.timestamp }
+                
+                self.pendingRequests = documents.compactMap { document -> HangoutRequest? in
+                    let data = document.data()
+                    
+                    guard let userId = data["userId"] as? String,
+                          let personaId = data["personaId"] as? String,
+                          let hangoutTypeRaw = data["hangoutType"] as? String,
+                          let hangoutType = HangoutType(rawValue: hangoutTypeRaw),
+                          let proposedTimeTimestamp = data["proposedTime"] as? Timestamp,
+                          let duration = data["duration"] as? Int,
+                          let status = data["status"] as? String,
+                          let timestampValue = data["timestamp"] as? Timestamp else {
+                        return nil
+                    }
+                    
+                    return HangoutRequest(
+                        id: document.documentID,
+                        userId: userId,
+                        personaId: personaId,
+                        hangoutType: hangoutType,
+                        proposedTime: proposedTimeTimestamp.dateValue(),
+                        duration: duration,
+                        status: status,
+                        timestamp: timestampValue.dateValue()
+                    )
+                }
             }
     }
     
     func approveRequest(_ request: HangoutRequest) {
-        // Update request status
-        db.collection("hangoutRequests").document(request.id).updateData([
-            "status": "approved"
-        ]) { error in
-            if let error = error {
-                print("Error approving request: \(error)")
-                return
-            }
-            
-            // Create Google Calendar event
-            self.createGoogleCalendarEvent(for: request)
-        }
+        updateRequestStatus(request, status: "approved")
     }
     
     func declineRequest(_ request: HangoutRequest) {
+        updateRequestStatus(request, status: "declined")
+    }
+    
+    private func updateRequestStatus(_ request: HangoutRequest, status: String) {
         db.collection("hangoutRequests").document(request.id).updateData([
-            "status": "declined"
-        ]) { error in
+            "status": status
+        ]) { [weak self] error in
             if let error = error {
-                print("Error declining request: \(error)")
+                self?.error = error
+            } else {
+                self?.loadPendingRequests()
             }
         }
     }
@@ -64,8 +91,14 @@ class PendingRequestsViewModel: ObservableObject {
 struct PendingRequestsView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel = PendingRequestsViewModel()
-    @State private var showingApprovalAlert = false
     @State private var selectedRequest: HangoutRequest?
+    @State private var showingAlert = false
+    @State private var alertAction: AlertAction?
+    
+    enum AlertAction {
+        case approve
+        case decline
+    }
     
     var body: some View {
         NavigationStack {
@@ -73,7 +106,9 @@ struct PendingRequestsView: View {
                 ThemeColors.backgroundGradient
                     .ignoresSafeArea()
                 
-                if viewModel.pendingRequests.isEmpty {
+                if viewModel.isLoading {
+                    ProgressView()
+                } else if viewModel.pendingRequests.isEmpty {
                     VStack {
                         Image(systemName: "bell.slash")
                             .font(.system(size: 50))
@@ -90,20 +125,22 @@ struct PendingRequestsView: View {
                             RequestCard(request: request)
                                 .listRowBackground(ThemeColors.lightGreen)
                                 .swipeActions(edge: .trailing) {
+                                    Button(role: .destructive) {
+                                        selectedRequest = request
+                                        alertAction = .decline
+                                        showingAlert = true
+                                    } label: {
+                                        Label("Decline", systemImage: "xmark.circle")
+                                    }
+                                    
                                     Button {
                                         selectedRequest = request
-                                        showingApprovalAlert = true
+                                        alertAction = .approve
+                                        showingAlert = true
                                     } label: {
-                                        Label("Approve", systemImage: "checkmark")
+                                        Label("Approve", systemImage: "checkmark.circle")
                                     }
                                     .tint(.green)
-                                }
-                                .swipeActions(edge: .leading) {
-                                    Button(role: .destructive) {
-                                        viewModel.declineRequest(request)
-                                    } label: {
-                                        Label("Decline", systemImage: "xmark")
-                                    }
                                 }
                         }
                     }
@@ -122,13 +159,25 @@ struct PendingRequestsView: View {
                     .foregroundColor(ThemeColors.textColor)
                 }
             }
-            .alert("Approve Request?", isPresented: $showingApprovalAlert, presenting: selectedRequest) { request in
-                Button("Cancel", role: .cancel) {}
-                Button("Approve") {
-                    viewModel.approveRequest(request)
+            .alert(isPresented: $showingAlert) {
+                if let request = selectedRequest, let action = alertAction {
+                    Alert(
+                        title: Text(action == .approve ? "Approve Request" : "Decline Request"),
+                        message: Text(action == .approve ? 
+                                   "Are you sure you want to approve this request?" :
+                                   "Are you sure you want to decline this request?"),
+                        primaryButton: .default(Text(action == .approve ? "Approve" : "Decline")) {
+                            if action == .approve {
+                                viewModel.approveRequest(request)
+                            } else {
+                                viewModel.declineRequest(request)
+                            }
+                        },
+                        secondaryButton: .cancel()
+                    )
+                } else {
+                    Alert(title: Text("Error"), message: Text("Something went wrong"))
                 }
-            } message: { request in
-                Text("This will create a calendar event for \(request.hangoutType.rawValue) with \(request.requesterName)")
             }
         }
     }
@@ -151,42 +200,14 @@ struct RequestCard: View {
                     .foregroundColor(ThemeColors.secondaryText)
             }
             
-            HStack {
-                Image(systemName: typeIcon(for: request.hangoutType))
-                    .foregroundColor(ThemeColors.textColor)
-                Text(request.hangoutType.rawValue)
-                    .foregroundColor(ThemeColors.textColor)
-            }
+            Text(request.hangoutType.rawValue)
+                .font(.subheadline)
+                .foregroundColor(ThemeColors.secondaryText)
             
-            HStack {
-                Image(systemName: "clock")
-                    .foregroundColor(ThemeColors.textColor)
-                Text(formatDateTime(request.proposedTime))
-                    .foregroundColor(ThemeColors.textColor)
-            }
-            
-            HStack {
-                Image(systemName: "hourglass")
-                    .foregroundColor(ThemeColors.textColor)
-                Text("\(request.duration, format: .number) hours")
-                    .foregroundColor(ThemeColors.textColor)
-            }
+            Text("Duration: \(request.duration / 60) hours")
+                .font(.subheadline)
+                .foregroundColor(ThemeColors.secondaryText)
         }
-        .padding(.vertical, 8)
-    }
-    
-    private func typeIcon(for type: HangoutType) -> String {
-        switch type {
-        case .hangout: return "person.2.fill"
-        case .walk: return "figure.walk"
-        case .dinner: return "fork.knife"
-        }
-    }
-    
-    private func formatDateTime(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        return formatter.string(from: date)
+        .padding()
     }
 }

@@ -27,6 +27,7 @@ class HangoutRequestService {
             "proposedTime": Timestamp(date: proposedTime),
             "duration": Int(duration * 60), // Convert hours to minutes
             "status": "pending",
+            "timestamp": Timestamp(date: Date()),
             "createdAt": FieldValue.serverTimestamp()
         ]
         
@@ -63,7 +64,8 @@ class HangoutRequestService {
                           let hangoutType = HangoutType(rawValue: hangoutTypeString),
                           let proposedTimeTimestamp = data["proposedTime"] as? Timestamp,
                           let duration = data["duration"] as? Int,
-                          let status = data["status"] as? String else {
+                          let status = data["status"] as? String,
+                          let timestamp = data["timestamp"] as? Timestamp else {
                         return nil
                     }
                     
@@ -74,7 +76,8 @@ class HangoutRequestService {
                         hangoutType: hangoutType,
                         proposedTime: proposedTimeTimestamp.dateValue(),
                         duration: duration,
-                        status: status
+                        status: status,
+                        timestamp: timestamp.dateValue()
                     )
                 }
                 
@@ -94,7 +97,7 @@ class HangoutRequestService {
     }
 }
 
-struct HangoutRequest: Identifiable {
+struct HangoutRequest: Identifiable, Decodable {
     let id: String
     let userId: String
     let personaId: String
@@ -102,4 +105,44 @@ struct HangoutRequest: Identifiable {
     let proposedTime: Date
     let duration: Int
     let status: String
+    let timestamp: Date
+    
+    var requesterName: String {
+        // TODO: Get the actual requester name from the persona
+        userId
+    }
+    
+    init(id: String, userId: String, personaId: String, hangoutType: HangoutType, proposedTime: Date, duration: Int, status: String, timestamp: Date) {
+        self.id = id
+        self.userId = userId
+        self.personaId = personaId
+        self.hangoutType = hangoutType
+        self.proposedTime = proposedTime
+        self.duration = duration
+        self.status = status
+        self.timestamp = timestamp
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId
+        case personaId
+        case hangoutType
+        case proposedTime
+        case duration
+        case status
+        case timestamp
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        userId = try container.decode(String.self, forKey: .userId)
+        personaId = try container.decode(String.self, forKey: .personaId)
+        hangoutType = try container.decode(HangoutType.self, forKey: .hangoutType)
+        proposedTime = try container.decode(Date.self, forKey: .proposedTime)
+        duration = try container.decode(Int.self, forKey: .duration)
+        status = try container.decode(String.self, forKey: .status)
+        timestamp = try container.decode(Date.self, forKey: .timestamp)
+    }
 }
