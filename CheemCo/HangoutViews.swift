@@ -1,10 +1,6 @@
 import SwiftUI
 import UIKit
 
-// Import Models to resolve ambiguity
-@_exported import struct CheemCo.Persona
-@_exported import enum CheemCo.HangoutType
-
 struct TimeSlotGroup: Identifiable {
     let id = UUID()
     let date: Date

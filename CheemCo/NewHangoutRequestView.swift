@@ -148,7 +148,6 @@ struct StepIndicatorView: View {
     let totalSteps: Int
     
     var body: some View {
-        // Implementation
         HStack {
             ForEach(0..<totalSteps, id: \.self) { step in
                 Circle()
