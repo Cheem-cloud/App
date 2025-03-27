@@ -124,25 +124,6 @@ struct SelectTimeSlotView: View {
     }
 }
 
-// Placeholder for other supporting views - implement as needed
-struct HangoutTypeSelectionView: View {
-    @Binding var selectedType: HangoutType
-    
-    var body: some View {
-        // Implementation
-        Text("Select Hangout Type")
-    }
-}
-
-struct DurationSelectionView: View {
-    @Binding var selectedDuration: Double
-    
-    var body: some View {
-        // Implementation
-        Text("Select Duration")
-    }
-}
-
 struct StepIndicatorView: View {
     let currentStep: Int
     let totalSteps: Int
