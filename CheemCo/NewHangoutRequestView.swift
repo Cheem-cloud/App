@@ -10,6 +10,13 @@ struct NewHangoutRequestView: View {
     
     private let steps = ["Persona", "Hangout Type", "Duration", "Date"]
     
+    private var hangoutTypeBinding: Binding<HangoutType> {
+        Binding(
+            get: { self.viewModel.selectedHangoutType },
+            set: { self.viewModel.selectedHangoutType = $0 }
+        )
+    }
+    
     var body: some View {
         NavigationStack {
             ZStack {
@@ -68,12 +75,10 @@ struct NewHangoutRequestView: View {
                                         }
                                     }
                             case 2:
-                                HangoutTypeSelectionView(selectedType: $viewModel.selectedHangoutType)
-                                    .onChange(of: viewModel.selectedHangoutType) { newValue in
-                                        if newValue != nil {
-                                            withAnimation(.easeInOut(duration: 0.3)) {
-                                                currentStep = 3
-                                            }
+                                HangoutTypeSelectionWrapper(selectedType: $viewModel.selectedHangoutType)
+                                    .onChange(of: viewModel.selectedHangoutType) { _ in
+                                        withAnimation(.easeInOut(duration: 0.3)) {
+                                            currentStep = 3
                                         }
                                     }
                             case 3:

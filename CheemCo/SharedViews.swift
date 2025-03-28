@@ -1,5 +1,16 @@
 import SwiftUI
 
+struct HangoutTypeSelectionWrapper: View {
+    @Binding var selectedType: HangoutType?
+    
+    var body: some View {
+        HangoutTypeSelectionView(selectedType: Binding(
+            get: { selectedType ?? .hangout },
+            set: { selectedType = $0 }
+        ))
+    }
+}
+
 struct HangoutTypeSelectionView: View {
     @Binding var selectedType: HangoutType
     
