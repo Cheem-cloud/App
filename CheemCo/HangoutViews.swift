@@ -23,6 +23,8 @@ class HangoutRequestViewModel: ObservableObject {
     @Published var isLoadingTimeSlots: Bool = false
     @Published var timeSlots: [TimeSlotGroup] = []
     
+    private let calendarService = GoogleCalendarService.shared
+    
     func moveToNextStep() {
         switch currentStep {
         case .persona:
@@ -31,6 +33,7 @@ class HangoutRequestViewModel: ObservableObject {
             currentStep = .duration
         case .duration:
             currentStep = .time
+            loadTimeSlots()
         case .time:
             break
         }
@@ -69,6 +72,30 @@ class HangoutRequestViewModel: ObservableObject {
     func selectPersonaAndContinue(_ persona: Persona) {
         selectedPersona = persona
         moveToNextStep()
+    }
+    
+    private func loadTimeSlots() {
+        guard let persona = selectedPersona else { return }
+        
+        isLoadingTimeSlots = true
+        timeSlots = []
+        
+        calendarService.getAvailableTimeSlots(
+            forEmail: persona.emailOwner,
+            requestedDuration: selectedDuration
+        ) { [weak self] result in
+            DispatchQueue.main.async {
+                self?.isLoadingTimeSlots = false
+                
+                switch result {
+                case .success(let daySlots):
+                    self?.timeSlots = daySlots.map { TimeSlotGroup(date: $0.date, slots: $0.slots) }
+                case .failure(let error):
+                    print("Failed to load time slots: \(error)")
+                    // TODO: Handle error state
+                }
+            }
+        }
     }
     
     var hangoutTypeBinding: Binding<HangoutType> {
