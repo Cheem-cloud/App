@@ -8,7 +8,7 @@ struct NewHangoutRequestView: View {
     @State private var currentStep = 1
     @State private var selectedTime: Date?
     
-    private let steps = ["Persona", "Hangout Type", "Date"]
+    private let steps = ["Persona", "Hangout Type", "Duration", "Date"]
     
     var body: some View {
         NavigationStack {
@@ -18,22 +18,28 @@ struct NewHangoutRequestView: View {
                 
                 VStack(spacing: 0) {
                     // Progress Bar
-                    VStack(spacing: 4) {
-                        // Progress line
-                        GeometryReader { geometry in
-                            ZStack(alignment: .leading) {
-                                // Background line
-                                Rectangle()
-                                    .fill(ThemeColors.secondaryText)
-                                    .frame(height: 2)
+                    VStack(spacing: 8) {
+                        HStack(spacing: 0) {
+                            ForEach(0..<steps.count, id: \.self) { index in
+                                // Dot
+                                Circle()
+                                    .fill(index + 1 <= currentStep ? ThemeColors.textColor : ThemeColors.secondaryText)
+                                    .frame(width: 12, height: 12)
+                                    .overlay(
+                                        Circle()
+                                            .stroke(index + 1 == currentStep ? ThemeColors.textColor : Color.clear, lineWidth: 2)
+                                    )
                                 
-                                // Progress line
-                                Rectangle()
-                                    .fill(ThemeColors.textColor)
-                                    .frame(width: geometry.size.width * CGFloat(currentStep) / CGFloat(steps.count), height: 2)
+                                // Line
+                                if index < steps.count - 1 {
+                                    Rectangle()
+                                        .fill(index + 1 < currentStep ? ThemeColors.textColor : ThemeColors.secondaryText)
+                                        .frame(height: 2)
+                                        .frame(maxWidth: .infinity)
+                                }
                             }
                         }
-                        .frame(height: 2)
+                        .padding(.horizontal)
                         
                         // Step labels
                         HStack {
@@ -56,14 +62,23 @@ struct NewHangoutRequestView: View {
                                 PersonaCarouselView(viewModel: viewModel)
                                     .onChange(of: viewModel.selectedPersona) { newValue in
                                         if newValue != nil {
-                                            withAnimation {
+                                            withAnimation(.easeInOut(duration: 0.3)) {
                                                 currentStep = 2
                                             }
                                         }
                                     }
                             case 2:
-                                DurationSelectionView(selectedDuration: $viewModel.selectedDuration)
+                                HangoutTypeSelectionView(selectedType: $viewModel.selectedHangoutType)
+                                    .onChange(of: viewModel.selectedHangoutType) { newValue in
+                                        if newValue != nil {
+                                            withAnimation(.easeInOut(duration: 0.3)) {
+                                                currentStep = 3
+                                            }
+                                        }
+                                    }
                             case 3:
+                                DurationSelectionView(selectedDuration: $viewModel.selectedDuration)
+                            case 4:
                                 TimeSlotPickerView(viewModel: viewModel, selectedTime: $selectedTime)
                             default:
                                 EmptyView()
@@ -78,7 +93,7 @@ struct NewHangoutRequestView: View {
                 ToolbarItem(placement: .navigationBarLeading) {
                     if currentStep > 1 {
                         Button("Back") {
-                            withAnimation {
+                            withAnimation(.easeInOut(duration: 0.3)) {
                                 currentStep -= 1
                             }
                         }
@@ -87,9 +102,9 @@ struct NewHangoutRequestView: View {
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    if currentStep < 3 {
+                    if currentStep < 4 {
                         Button("Next") {
-                            withAnimation {
+                            withAnimation(.easeInOut(duration: 0.3)) {
                                 currentStep += 1
                             }
                         }
