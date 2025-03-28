@@ -9,7 +9,7 @@ struct TimeSlotGroup: Identifiable {
 
 class HangoutRequestViewModel: ObservableObject {
     @Published var selectedPersona: Persona?
-    @Published var selectedHangoutType: HangoutType?
+    @Published var selectedHangoutType: HangoutType = .hangout
     @Published var selectedDuration: Double = 1.0
     @Published var selectedTimeSlot: Date?
     @Published var isLoadingTimeSlots: Bool = false
