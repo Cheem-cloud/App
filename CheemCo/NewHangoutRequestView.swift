@@ -6,74 +6,54 @@ struct NewHangoutRequestView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel = HangoutRequestViewModel()
     @State private var currentStep = 1
-    @State private var selectedPersona: Persona?
     @State private var selectedTime: Date?
     
     var body: some View {
-        NavigationStack {
-            ZStack {
-                ThemeColors.backgroundGradient
-                    .ignoresSafeArea()
-                
-                VStack {
-                    StepIndicatorView(currentStep: currentStep, totalSteps: 3)
-                        .padding(.top)
+        ZStack {
+            ThemeColors.backgroundGradient
+                .ignoresSafeArea()
+            
+            VStack {
+                HStack {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .foregroundColor(ThemeColors.textColor)
+                    }
+                    .padding()
                     
-                    ScrollView {
-                        VStack(spacing: 20) {
-                            switch currentStep {
-                            case 1:
-                                PersonaCarouselView(viewModel: viewModel)
-                            case 2:
-                                DurationSelectionView(selectedDuration: $viewModel.selectedDuration)
-                            case 3:
-                                TimeSlotPickerView(viewModel: viewModel, selectedTime: $selectedTime)
-                            default:
-                                EmptyView()
-                            }
-                        }
-                        .padding()
-                    }
-                }
-            }
-            .navigationTitle("New Hangout Request")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(ThemeColors.darkGreen, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    if currentStep > 1 {
-                        Button("Back") {
-                            withAnimation {
-                                currentStep -= 1
-                            }
-                        }
-                        .foregroundColor(ThemeColors.textColor)
-                    }
+                    Spacer()
                 }
                 
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    if currentStep < 3 {
-                        Button("Next") {
-                            withAnimation {
-                                currentStep += 1
-                            }
+                ScrollView {
+                    VStack(spacing: 20) {
+                        switch currentStep {
+                        case 1:
+                            PersonaCarouselView(viewModel: viewModel)
+                                .onChange(of: viewModel.selectedPersona) { newValue in
+                                    if newValue != nil {
+                                        withAnimation {
+                                            currentStep = 2
+                                        }
+                                    }
+                                }
+                        case 2:
+                            DurationSelectionView(selectedDuration: $viewModel.selectedDuration)
+                        case 3:
+                            TimeSlotPickerView(viewModel: viewModel, selectedTime: $selectedTime)
+                        default:
+                            EmptyView()
                         }
-                        .foregroundColor(ThemeColors.textColor)
-                    } else {
-                        Button("Submit") {
-                            submitRequest()
-                        }
-                        .disabled(selectedTime == nil)
-                        .foregroundColor(ThemeColors.textColor)
                     }
+                    .padding()
                 }
             }
         }
     }
     
     private func submitRequest() {
-        guard let persona = selectedPersona,
+        guard let persona = viewModel.selectedPersona,
               let time = selectedTime,
               let hangoutType = viewModel.selectedHangoutType else { return }
         

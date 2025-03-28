@@ -1,6 +1,6 @@
 import Foundation
 
-struct Persona: Identifiable, Codable {
+struct Persona: Identifiable, Codable, Equatable {
     var id: String
     var emailOwner: String      // The email address that owns this persona
     var name: String            // Name of the persona
@@ -9,6 +9,10 @@ struct Persona: Identifiable, Codable {
     var profileImage: String?   // URL to profile image
     var interests: [String]
     var preferredActivities: [String]
+    
+    static func == (lhs: Persona, rhs: Persona) -> Bool {
+        lhs.id == rhs.id
+    }
 }
 
 

@@ -13,21 +13,19 @@ struct PersonaCarouselView: View {
             TabView {
                 ForEach(Persona.examples) { persona in
                     VStack {
-                        Spacer()
-                        
                         VStack(spacing: 16) {
                             // Profile Image or Initial
                             Circle()
                                 .fill(ThemeColors.lightGreen)
-                                .frame(width: 100, height: 100)
+                                .frame(width: 80, height: 80)
                                 .overlay(
                                     Text(persona.name.prefix(1).uppercased())
-                                        .font(.system(size: 40, weight: .bold))
+                                        .font(.system(size: 32, weight: .bold))
                                         .foregroundColor(ThemeColors.textColor)
                                 )
                             
                             // Name and Type
-                            VStack(spacing: 8) {
+                            VStack(spacing: 4) {
                                 Text(persona.name)
                                     .font(.title2)
                                     .fontWeight(.bold)
@@ -79,19 +77,27 @@ struct PersonaCarouselView: View {
                             .padding(.bottom)
                         }
                         .frame(maxWidth: .infinity)
-                        .frame(height: 500)
+                        .frame(height: 400)
                         .padding()
-                        .background(ThemeColors.darkGreen)
+                        .background(Color.white)
                         .cornerRadius(20)
                         .shadow(radius: 5)
-                        
-                        Spacer()
                     }
                     .padding(.horizontal)
                 }
             }
-            .frame(height: 600)
+            .frame(height: 500)
             .tabViewStyle(PageTabViewStyle(indexDisplayMode: .always))
+            
+            // Page dots below the cards
+            HStack {
+                ForEach(0..<Persona.examples.count, id: \.self) { index in
+                    Circle()
+                        .fill(ThemeColors.textColor)
+                        .frame(width: 8, height: 8)
+                }
+            }
+            .padding(.top, 20)
         }
     }
 }
