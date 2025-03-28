@@ -71,166 +71,125 @@ struct AddUserView: View {
 }
 
 struct SettingsView: View {
-    @EnvironmentObject private var authState: AuthenticationState
-    @EnvironmentObject private var eventManager: EventManager
-    @State private var showingAddUsersConfirmation = false
-    @State private var showingAddSingleUser = false
-    @State private var addUsersResult = ""
-    @State private var isAddingUsers = false
+    @StateObject private var viewModel = SettingsViewModel()
+    @Environment(\.dismiss) private var dismiss
     
     var body: some View {
         NavigationView {
-            ZStack {
-                ThemeColors.backgroundGradient
-                    .ignoresSafeArea()
-                
-                List {
-                    Section(header: Text("Account").foregroundColor(ThemeColors.textColor)) {
-                        Button(action: {
-                            eventManager.signOutGoogle()  // Sign out of Google first
-                            authState.signOut()          // Then sign out of Firebase
-                        }) {
-                            Text("Sign Out")
-                                .foregroundColor(.red)
-                        }
-                        .listRowBackground(ThemeColors.lightGreen)
-                    }
-                    
-                    if eventManager.isGoogleSignedIn {
-                        Section(header: Text("Google Calendar").foregroundColor(ThemeColors.textColor)) {
-                            Button(action: {
-                                eventManager.signOutGoogle()
-                            }) {
-                                Text("Disconnect Google Calendar")
-                                    .foregroundColor(.orange)
-                            }
-                            .listRowBackground(ThemeColors.lightGreen)
+            List {
+                if let settings = viewModel.settings {
+                    Section("Primary Calendar") {
+                        CalendarUserRow(user: settings.primaryUser) {
+                            viewModel.connectCalendar(for: settings.primaryUser)
+                        } onDisconnect: {
+                            viewModel.disconnectCalendar(for: settings.primaryUser.email)
+                        } onRefresh: {
+                            viewModel.refreshCalendarAccess(for: settings.primaryUser.email)
                         }
                     }
                     
-                    Section(header: Text("About").foregroundColor(ThemeColors.textColor)) {
-                        HStack {
-                            Text("Version")
-                                .foregroundColor(ThemeColors.textColor)
-                            Spacer()
-                            Text("1.0.0")
-                                .foregroundColor(ThemeColors.secondaryText)
+                    Section("Secondary Calendar") {
+                        if let secondaryUser = settings.secondaryUser {
+                            CalendarUserRow(user: secondaryUser) {
+                                viewModel.connectCalendar(for: secondaryUser)
+                            } onDisconnect: {
+                                viewModel.disconnectCalendar(for: secondaryUser.email)
+                            } onRefresh: {
+                                viewModel.refreshCalendarAccess(for: secondaryUser.email)
+                            }
+                        } else {
+                            Button("Add Secondary Calendar") {
+                                viewModel.inviteSecondaryUser(email: "")
+                            }
                         }
-                        .listRowBackground(ThemeColors.lightGreen)
                     }
-                    
-                    // Debug Section
-                    Section(header: Text("Debug Options").foregroundColor(ThemeColors.textColor)) {
-                        // Add Single User Button
-                        Button(action: {
-                            showingAddSingleUser = true
-                        }) {
-                            HStack {
-                                Image(systemName: "person.fill.badge.plus")
-                                Text("Add Single Test User")
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                            }
-                            .foregroundColor(ThemeColors.textColor)
-                        }
-                        .listRowBackground(ThemeColors.lightGreen)
-                        
-                        // Add Preset Users Button
-                        Button(action: {
-                            showingAddUsersConfirmation = true
-                        }) {
-                            HStack {
-                                Image(systemName: "person.3.fill")
-                                Text("Add Preset Test Users")
-                                Spacer()
-                                if isAddingUsers {
-                                    ProgressView()
-                                } else {
-                                    Image(systemName: "chevron.right")
-                                }
-                            }
-                            .foregroundColor(ThemeColors.textColor)
-                        }
-                        .listRowBackground(ThemeColors.lightGreen)
-                        
-                        if !addUsersResult.isEmpty {
-                            Text(addUsersResult)
-                                .foregroundColor(addUsersResult.contains("Error") ? .red : .green)
-                                .listRowBackground(ThemeColors.lightGreen)
+                } else {
+                    Section {
+                        Button("Connect Primary Calendar") {
+                            viewModel.connectCalendar(for: UserSettings.CalendarUser(
+                                email: "",
+                                accessToken: "",
+                                personas: [],
+                                isCalendarAuthorized: false,
+                                lastTokenRefresh: nil
+                            ))
                         }
                     }
                 }
-                .scrollContentBackground(.hidden)
             }
-            .navigationTitle("Settings")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(ThemeColors.darkGreen, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .sheet(isPresented: $showingAddSingleUser) {
-                AddUserView(addUsersResult: $addUsersResult)
+            .navigationTitle("Calendar Settings")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
             }
-            .alert("Add Preset Test Users", isPresented: $showingAddUsersConfirmation) {
-                Button("Cancel", role: .cancel) { }
-                Button("Add Users") {
-                    addPresetTestUsers()
+            .overlay {
+                if viewModel.isLoading {
+                    ProgressView()
+                        .background(Color.black.opacity(0.2))
+                }
+            }
+            .alert("Error", isPresented: .constant(viewModel.error != nil)) {
+                Button("OK") {
+                    viewModel.error = nil
                 }
             } message: {
-                Text("This will add 3 example users to the database. Continue?")
+                if let error = viewModel.error {
+                    Text(error)
+                }
             }
         }
     }
+}
+
+struct CalendarUserRow: View {
+    let user: UserSettings.CalendarUser
+    let onConnect: () -> Void
+    let onDisconnect: () -> Void
+    let onRefresh: () -> Void
     
-    private func addPresetTestUsers() {
-        print("addTestUsers function called")
-        isAddingUsers = true
-        addUsersResult = "Adding users..."
-        
-        let db = Firestore.firestore()
-        let testUsers = [
-            [
-                "id": "test_user_1",
-                "name": "Kendall Smith",
-                "email": "kendall@example.com",
-                "fcmToken": "test_token_1"
-            ] as [String: Any],
-            [
-                "id": "test_user_2",
-                "name": "Alex Johnson",
-                "email": "alex@example.com",
-                "fcmToken": "test_token_2"
-            ] as [String: Any],
-            [
-                "id": "test_user_3",
-                "name": "Chris Williams",
-                "email": "chris@example.com",
-                "fcmToken": "test_token_3"
-            ] as [String: Any]
-        ]
-        
-        print("Starting to add \(testUsers.count) users to Firestore")
-        
-        for user in testUsers {
-            print("Attempting to add user: \(user["name"] ?? "")")
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(user.email)
+                .font(.headline)
             
-            db.collection("users").document(user["id"] as! String).setData(user) { error in
-                DispatchQueue.main.async {
-                    if let error = error {
-                        print("Error adding user: \(error.localizedDescription)")
-                        addUsersResult = "Error: \(error.localizedDescription)"
-                        isAddingUsers = false
-                    } else {
-                        print("Successfully added user: \(user["name"] ?? "")")
-                        addUsersResult = "Added user: \(user["name"] ?? "")"
-                    }
+            if user.isCalendarAuthorized {
+                HStack {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                    Text("Connected")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
                 }
+                
+                if let lastRefresh = user.lastTokenRefresh {
+                    Text("Last refreshed: \(lastRefresh.formatted())")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                HStack {
+                    Button("Refresh Access") {
+                        onRefresh()
+                    }
+                    .buttonStyle(.bordered)
+                    
+                    Button("Disconnect") {
+                        onDisconnect()
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.red)
+                }
+            } else {
+                Button("Connect Calendar") {
+                    onConnect()
+                }
+                .buttonStyle(.bordered)
             }
         }
-        
-        // Final confirmation after slight delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            addUsersResult = "Completed adding test users"
-            isAddingUsers = false
-        }
+        .padding(.vertical, 4)
     }
 }
 

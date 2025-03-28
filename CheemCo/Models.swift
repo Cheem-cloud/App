@@ -1,5 +1,18 @@
 import Foundation
 
+struct UserSettings: Codable {
+    var primaryUser: CalendarUser
+    var secondaryUser: CalendarUser?
+    
+    struct CalendarUser: Codable {
+        let email: String
+        var accessToken: String
+        let personas: [Persona]
+        var isCalendarAuthorized: Bool
+        var lastTokenRefresh: Date?
+    }
+}
+
 struct Persona: Identifiable, Codable, Equatable {
     var id: String
     var emailOwner: String      // The email address that owns this persona
