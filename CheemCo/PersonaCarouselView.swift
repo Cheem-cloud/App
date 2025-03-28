@@ -78,6 +78,8 @@ struct PersonaCarouselView: View {
                             .padding(.horizontal)
                             .padding(.bottom)
                         }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 500)
                         .padding()
                         .background(ThemeColors.darkGreen)
                         .cornerRadius(20)
@@ -88,6 +90,7 @@ struct PersonaCarouselView: View {
                     .padding(.horizontal)
                 }
             }
+            .frame(height: 600)
             .tabViewStyle(PageTabViewStyle(indexDisplayMode: .always))
         }
     }
