@@ -8,23 +8,40 @@ struct NewHangoutRequestView: View {
     @State private var currentStep = 1
     @State private var selectedTime: Date?
     
+    private let steps = ["Persona", "Hangout Type", "Date"]
+    
     var body: some View {
         ZStack {
             ThemeColors.backgroundGradient
                 .ignoresSafeArea()
             
-            VStack {
-                HStack {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .foregroundColor(ThemeColors.textColor)
+            VStack(spacing: 0) {
+                // Progress Bar
+                VStack(spacing: 8) {
+                    HStack {
+                        ForEach(0..<steps.count, id: \.self) { index in
+                            VStack(spacing: 4) {
+                                Text(steps[index])
+                                    .font(.caption)
+                                    .foregroundColor(index + 1 == currentStep ? ThemeColors.textColor : ThemeColors.secondaryText)
+                                
+                                Rectangle()
+                                    .fill(index + 1 <= currentStep ? ThemeColors.textColor : ThemeColors.secondaryText)
+                                    .frame(height: 2)
+                            }
+                            .frame(maxWidth: .infinity)
+                            
+                            if index < steps.count - 1 {
+                                Rectangle()
+                                    .fill(index + 1 < currentStep ? ThemeColors.textColor : ThemeColors.secondaryText)
+                                    .frame(height: 2)
+                            }
+                        }
                     }
-                    .padding()
-                    
-                    Spacer()
+                    .padding(.horizontal)
+                    .padding(.top)
                 }
+                .padding(.bottom, 20)
                 
                 ScrollView {
                     VStack(spacing: 20) {
@@ -47,6 +64,17 @@ struct NewHangoutRequestView: View {
                         }
                     }
                     .padding()
+                }
+            }
+        }
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .foregroundColor(ThemeColors.textColor)
                 }
             }
         }
