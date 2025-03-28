@@ -18,12 +18,17 @@ class HangoutRequestViewModel: ObservableObject {
     @Published var currentStep: HangoutRequestStep = .persona
     @Published var selectedPersona: Persona?
     @Published var selectedHangoutType: HangoutType = .hangout
-    @Published var selectedDuration: Double = 1.0
+    @Published var selectedDuration: TimeInterval = 3600 // 1 hour default
     @Published var selectedTimeSlot: Date?
     @Published var isLoadingTimeSlots: Bool = false
     @Published var timeSlots: [TimeSlotGroup] = []
+    @Published var availableTimeSlots: [GoogleCalendarService.DayTimeSlots] = []
+    @Published var isLoading = false
+    @Published var error: String?
     
     private let calendarService = GoogleCalendarService.shared
+    private let defaults = UserDefaults.standard
+    private let settingsKey = "userSettings"
     
     func moveToNextStep() {
         switch currentStep {
@@ -96,6 +101,42 @@ class HangoutRequestViewModel: ObservableObject {
                 }
             }
         }
+    }
+    
+    func loadAvailableTimeSlots() {
+        guard let settings = loadSettings() else {
+            error = "Please connect your calendar in Settings first"
+            return
+        }
+        
+        isLoading = true
+        error = nil
+        
+        // Use the primary user's access token
+        calendarService.getAvailableTimeSlots(
+            forEmail: settings.primaryUser.email,
+            requestedDuration: selectedDuration
+        ) { [weak self] result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let daySlots):
+                    self?.availableTimeSlots = daySlots
+                    self?.timeSlots = daySlots.map { TimeSlotGroup(date: $0.date, slots: $0.slots) }
+                    self?.isLoading = false
+                case .failure(let error):
+                    self?.error = error.localizedDescription
+                    self?.isLoading = false
+                }
+            }
+        }
+    }
+    
+    private func loadSettings() -> UserSettings? {
+        if let data = defaults.data(forKey: settingsKey),
+           let settings = try? JSONDecoder().decode(UserSettings.self, from: data) {
+            return settings
+        }
+        return nil
     }
     
     var hangoutTypeBinding: Binding<HangoutType> {
