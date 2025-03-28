@@ -16,6 +16,8 @@ class GoogleCalendarConfig {
     
     private init() {}
     
+    var currentUserEmail: String?
+    
     func configureGoogleCalendar() throws {
         guard let clientID = FirebaseApp.app()?.options.clientID else {
             throw GoogleCalendarError.noClientID
@@ -38,22 +40,27 @@ class GoogleCalendarConfig {
             return
         }
         
+        // Use signInWithPresenting to show account picker
         GIDSignIn.sharedInstance.signIn(
             withPresenting: rootViewController,
             hint: nil,
-            additionalScopes: scopes
-        ) { result, error in
-            if let error = error {
-                completion(.failure(GoogleCalendarError.signInFailed(error.localizedDescription)))
-                return
+            additionalScopes: scopes,
+            completion: { result, error in
+                if let error = error {
+                    completion(.failure(GoogleCalendarError.signInFailed(error.localizedDescription)))
+                    return
+                }
+                
+                guard let accessToken = result?.user.accessToken.tokenString else {
+                    completion(.failure(GoogleCalendarError.noAccessToken))
+                    return
+                }
+                
+                // Store the current user's email
+                self.currentUserEmail = result?.user.profile?.email
+                
+                completion(.success(accessToken))
             }
-            
-            guard let accessToken = result?.user.accessToken.tokenString else {
-                completion(.failure(GoogleCalendarError.noAccessToken))
-                return
-            }
-            
-            completion(.success(accessToken))
-        }
+        )
     }
 }

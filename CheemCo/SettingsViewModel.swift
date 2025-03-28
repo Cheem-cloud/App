@@ -1,6 +1,7 @@
 import Foundation
 import GoogleSignIn
 import FirebaseCore
+import FirebaseFirestore
 
 class SettingsViewModel: ObservableObject {
     @Published var settings: UserSettings?
@@ -32,6 +33,12 @@ class SettingsViewModel: ObservableObject {
         isLoading = true
         error = nil
         
+        // Configure Google Sign-In to handle multiple accounts
+        if let clientID = FirebaseApp.app()?.options.clientID {
+            GIDSignIn.sharedInstance.configuration = GIDConfiguration(clientID: clientID)
+        }
+        
+        // Start new sign-in flow without signing out
         GoogleCalendarConfig.shared.authorizeCalendarAccess { [weak self] result in
             DispatchQueue.main.async {
                 self?.isLoading = false
@@ -69,14 +76,6 @@ class SettingsViewModel: ObservableObject {
             settings?.secondaryUser?.isCalendarAuthorized = false
         }
         saveSettings()
-    }
-    
-    func inviteSecondaryUser(email: String) {
-        // TODO: Implement invitation system
-        // This could involve:
-        // 1. Sending an email invitation
-        // 2. Creating a pending connection
-        // 3. Waiting for the secondary user to accept
     }
     
     func refreshCalendarAccess(for email: String) {

@@ -78,29 +78,58 @@ struct SettingsView: View {
         NavigationView {
             List {
                 if let settings = viewModel.settings {
-                    Section("Primary Calendar") {
-                        CalendarUserRow(user: settings.primaryUser) {
-                            viewModel.connectCalendar(for: settings.primaryUser)
-                        } onDisconnect: {
-                            viewModel.disconnectCalendar(for: settings.primaryUser.email)
-                        } onRefresh: {
-                            viewModel.refreshCalendarAccess(for: settings.primaryUser.email)
+                    Section("Connected Calendars") {
+                        ForEach(getConnectedCalendars(settings), id: \.email) { user in
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    Text(user.email)
+                                        .font(.headline)
+                                    Spacer()
+                                    if user.isCalendarAuthorized {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundColor(.green)
+                                    }
+                                }
+                                
+                                if user.isCalendarAuthorized {
+                                    if let lastRefresh = user.lastTokenRefresh {
+                                        Text("Last refreshed: \(lastRefresh.formatted())")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    
+                                    HStack {
+                                        Button("Refresh Access") {
+                                            viewModel.refreshCalendarAccess(for: user.email)
+                                        }
+                                        .buttonStyle(.bordered)
+                                        
+                                        Button("Disconnect") {
+                                            viewModel.disconnectCalendar(for: user.email)
+                                        }
+                                        .buttonStyle(.bordered)
+                                        .tint(.red)
+                                    }
+                                } else {
+                                    Button("Connect Calendar") {
+                                        viewModel.connectCalendar(for: user)
+                                    }
+                                    .buttonStyle(.bordered)
+                                }
+                            }
+                            .padding(.vertical, 4)
                         }
                     }
                     
-                    Section("Secondary Calendar") {
-                        if let secondaryUser = settings.secondaryUser {
-                            CalendarUserRow(user: secondaryUser) {
-                                viewModel.connectCalendar(for: secondaryUser)
-                            } onDisconnect: {
-                                viewModel.disconnectCalendar(for: secondaryUser.email)
-                            } onRefresh: {
-                                viewModel.refreshCalendarAccess(for: secondaryUser.email)
-                            }
-                        } else {
-                            Button("Add Secondary Calendar") {
-                                viewModel.inviteSecondaryUser(email: "")
-                            }
+                    Section {
+                        Button("Add Another Calendar") {
+                            viewModel.connectCalendar(for: UserSettings.CalendarUser(
+                                email: "",
+                                accessToken: "",
+                                personas: [],
+                                isCalendarAuthorized: false,
+                                lastTokenRefresh: nil
+                            ))
                         }
                     }
                 } else {
@@ -142,54 +171,21 @@ struct SettingsView: View {
             }
         }
     }
-}
-
-struct CalendarUserRow: View {
-    let user: UserSettings.CalendarUser
-    let onConnect: () -> Void
-    let onDisconnect: () -> Void
-    let onRefresh: () -> Void
     
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(user.email)
-                .font(.headline)
-            
-            if user.isCalendarAuthorized {
-                HStack {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
-                    Text("Connected")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-                
-                if let lastRefresh = user.lastTokenRefresh {
-                    Text("Last refreshed: \(lastRefresh.formatted())")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                
-                HStack {
-                    Button("Refresh Access") {
-                        onRefresh()
-                    }
-                    .buttonStyle(.bordered)
-                    
-                    Button("Disconnect") {
-                        onDisconnect()
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(.red)
-                }
-            } else {
-                Button("Connect Calendar") {
-                    onConnect()
-                }
-                .buttonStyle(.bordered)
-            }
+    private func getConnectedCalendars(_ settings: UserSettings) -> [UserSettings.CalendarUser] {
+        var calendars: [UserSettings.CalendarUser] = []
+        
+        // Add primary user if exists
+        if !settings.primaryUser.email.isEmpty {
+            calendars.append(settings.primaryUser)
         }
-        .padding(.vertical, 4)
+        
+        // Add secondary user if exists
+        if let secondaryUser = settings.secondaryUser, !secondaryUser.email.isEmpty {
+            calendars.append(secondaryUser)
+        }
+        
+        return calendars
     }
 }
 
