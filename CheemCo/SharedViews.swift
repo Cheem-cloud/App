@@ -1,18 +1,20 @@
 import SwiftUI
 
-struct HangoutTypeSelectionWrapper: View {
-    @Binding var selectedType: HangoutType?
+struct PersonaSelectionStep: View {
+    @ObservedObject var viewModel: HangoutRequestViewModel
     
     var body: some View {
-        HangoutTypeSelectionView(selectedType: Binding(
-            get: { selectedType ?? .hangout },
-            set: { selectedType = $0 }
-        ))
+        PersonaCarouselView(viewModel: viewModel)
+            .onChange(of: viewModel.selectedPersona) { newValue in
+                if newValue != nil {
+                    viewModel.moveToNextStep()
+                }
+            }
     }
 }
 
-struct HangoutTypeSelectionView: View {
-    @Binding var selectedType: HangoutType
+struct HangoutTypeStep: View {
+    @ObservedObject var viewModel: HangoutRequestViewModel
     
     var body: some View {
         VStack(spacing: 20) {
@@ -23,7 +25,8 @@ struct HangoutTypeSelectionView: View {
             
             ForEach(HangoutType.allCases, id: \.self) { type in
                 Button {
-                    selectedType = type
+                    viewModel.selectedHangoutType = type
+                    viewModel.moveToNextStep()
                 } label: {
                     HStack {
                         Image(systemName: type.icon)
@@ -39,13 +42,13 @@ struct HangoutTypeSelectionView: View {
                         
                         Spacer()
                         
-                        if type == selectedType {
+                        if type == viewModel.selectedHangoutType {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundColor(ThemeColors.textColor)
                         }
                     }
                     .padding()
-                    .background(type == selectedType ? ThemeColors.lightGreen : ThemeColors.darkGreen)
+                    .background(type == viewModel.selectedHangoutType ? ThemeColors.lightGreen : ThemeColors.darkGreen)
                     .foregroundColor(ThemeColors.textColor)
                     .cornerRadius(10)
                 }
@@ -54,8 +57,8 @@ struct HangoutTypeSelectionView: View {
     }
 }
 
-struct DurationSelectionView: View {
-    @Binding var selectedDuration: Double
+struct DurationStep: View {
+    @ObservedObject var viewModel: HangoutRequestViewModel
     
     let durations = [
         (0.5, "30 minutes"),
@@ -74,7 +77,8 @@ struct DurationSelectionView: View {
             
             ForEach(durations, id: \.0) { duration in
                 Button {
-                    selectedDuration = duration.0
+                    viewModel.selectedDuration = duration.0
+                    viewModel.moveToNextStep()
                 } label: {
                     HStack {
                         Image(systemName: "clock")
@@ -85,17 +89,26 @@ struct DurationSelectionView: View {
                         
                         Spacer()
                         
-                        if selectedDuration == duration.0 {
+                        if viewModel.selectedDuration == duration.0 {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundColor(ThemeColors.textColor)
                         }
                     }
                     .padding()
-                    .background(selectedDuration == duration.0 ? ThemeColors.lightGreen : ThemeColors.darkGreen)
+                    .background(viewModel.selectedDuration == duration.0 ? ThemeColors.lightGreen : ThemeColors.darkGreen)
                     .foregroundColor(ThemeColors.textColor)
                     .cornerRadius(10)
                 }
             }
         }
+    }
+}
+
+struct TimeSelectionStep: View {
+    @ObservedObject var viewModel: HangoutRequestViewModel
+    @Binding var selectedTime: Date?
+    
+    var body: some View {
+        TimeSlotPickerView(viewModel: viewModel, selectedTime: $selectedTime)
     }
 } 

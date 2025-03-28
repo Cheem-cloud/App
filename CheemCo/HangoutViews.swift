@@ -1,6 +1,13 @@
 import SwiftUI
 import UIKit
 
+enum HangoutRequestStep {
+    case persona
+    case type
+    case duration
+    case time
+}
+
 struct TimeSlotGroup: Identifiable {
     let id = UUID()
     let date: Date
@@ -8,6 +15,7 @@ struct TimeSlotGroup: Identifiable {
 }
 
 class HangoutRequestViewModel: ObservableObject {
+    @Published var currentStep: HangoutRequestStep = .persona
     @Published var selectedPersona: Persona?
     @Published var selectedHangoutType: HangoutType = .hangout
     @Published var selectedDuration: Double = 1.0
@@ -15,13 +23,59 @@ class HangoutRequestViewModel: ObservableObject {
     @Published var isLoadingTimeSlots: Bool = false
     @Published var timeSlots: [TimeSlotGroup] = []
     
+    func moveToNextStep() {
+        switch currentStep {
+        case .persona:
+            currentStep = .type
+        case .type:
+            currentStep = .duration
+        case .duration:
+            currentStep = .time
+        case .time:
+            break
+        }
+    }
+    
+    func moveToPreviousStep() {
+        switch currentStep {
+        case .persona:
+            break
+        case .type:
+            currentStep = .persona
+        case .duration:
+            currentStep = .type
+        case .time:
+            currentStep = .duration
+        }
+    }
+    
+    func canMoveToNextStep() -> Bool {
+        switch currentStep {
+        case .persona:
+            return selectedPersona != nil
+        case .type:
+            return true // Always has a default value
+        case .duration:
+            return true // Always has a default value
+        case .time:
+            return selectedTimeSlot != nil
+        }
+    }
+    
     func createHangoutRequest() {
         // TODO: Implement hangout request creation
     }
     
     func selectPersonaAndContinue(_ persona: Persona) {
         selectedPersona = persona
-        // Additional logic for continuing to the next step can be added here
+        moveToNextStep()
+    }
+    
+    var hangoutTypeBinding: Binding<HangoutType> {
+        Binding(
+            get: { self.selectedHangoutType },
+            set: { self.selectedHangoutType = $0 }
+        )
     }
 }
 

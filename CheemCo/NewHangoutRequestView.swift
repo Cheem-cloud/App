@@ -5,17 +5,9 @@ import SwiftUI
 struct NewHangoutRequestView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel = HangoutRequestViewModel()
-    @State private var currentStep = 1
     @State private var selectedTime: Date?
     
     private let steps = ["Persona", "Hangout Type", "Duration", "Date"]
-    
-    private var hangoutTypeBinding: Binding<HangoutType> {
-        Binding(
-            get: { self.viewModel.selectedHangoutType },
-            set: { self.viewModel.selectedHangoutType = $0 }
-        )
-    }
     
     var body: some View {
         NavigationStack {
@@ -30,17 +22,17 @@ struct NewHangoutRequestView: View {
                             ForEach(0..<steps.count, id: \.self) { index in
                                 // Dot
                                 Circle()
-                                    .fill(index + 1 <= currentStep ? ThemeColors.textColor : ThemeColors.secondaryText)
+                                    .fill(index + 1 <= currentStepIndex ? ThemeColors.textColor : ThemeColors.secondaryText)
                                     .frame(width: 12, height: 12)
                                     .overlay(
                                         Circle()
-                                            .stroke(index + 1 == currentStep ? ThemeColors.textColor : Color.clear, lineWidth: 2)
+                                            .stroke(index + 1 == currentStepIndex ? ThemeColors.textColor : Color.clear, lineWidth: 2)
                                     )
                                 
                                 // Line
                                 if index < steps.count - 1 {
                                     Rectangle()
-                                        .fill(index + 1 < currentStep ? ThemeColors.textColor : ThemeColors.secondaryText)
+                                        .fill(index + 1 < currentStepIndex ? ThemeColors.textColor : ThemeColors.secondaryText)
                                         .frame(height: 2)
                                         .frame(maxWidth: .infinity)
                                 }
@@ -53,7 +45,7 @@ struct NewHangoutRequestView: View {
                             ForEach(0..<steps.count, id: \.self) { index in
                                 Text(steps[index])
                                     .font(.caption)
-                                    .foregroundColor(index + 1 == currentStep ? ThemeColors.textColor : ThemeColors.secondaryText)
+                                    .foregroundColor(index + 1 == currentStepIndex ? ThemeColors.textColor : ThemeColors.secondaryText)
                                     .frame(maxWidth: .infinity)
                             }
                         }
@@ -64,29 +56,15 @@ struct NewHangoutRequestView: View {
                     
                     ScrollView {
                         VStack(spacing: 20) {
-                            switch currentStep {
-                            case 1:
-                                PersonaCarouselView(viewModel: viewModel)
-                                    .onChange(of: viewModel.selectedPersona) { newValue in
-                                        if newValue != nil {
-                                            withAnimation(.easeInOut(duration: 0.3)) {
-                                                currentStep = 2
-                                            }
-                                        }
-                                    }
-                            case 2:
-                                HangoutTypeSelectionWrapper(selectedType: $viewModel.selectedHangoutType)
-                                    .onChange(of: viewModel.selectedHangoutType) { _ in
-                                        withAnimation(.easeInOut(duration: 0.3)) {
-                                            currentStep = 3
-                                        }
-                                    }
-                            case 3:
-                                DurationSelectionView(selectedDuration: $viewModel.selectedDuration)
-                            case 4:
-                                TimeSlotPickerView(viewModel: viewModel, selectedTime: $selectedTime)
-                            default:
-                                EmptyView()
+                            switch viewModel.currentStep {
+                            case .persona:
+                                PersonaSelectionStep(viewModel: viewModel)
+                            case .type:
+                                HangoutTypeStep(viewModel: viewModel)
+                            case .duration:
+                                DurationStep(viewModel: viewModel)
+                            case .time:
+                                TimeSelectionStep(viewModel: viewModel, selectedTime: $selectedTime)
                             }
                         }
                         .padding()
@@ -96,23 +74,22 @@ struct NewHangoutRequestView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    if currentStep > 1 {
+                    if viewModel.currentStep != .persona {
                         Button("Back") {
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                currentStep -= 1
-                            }
+                            viewModel.moveToPreviousStep()
                         }
                         .foregroundColor(ThemeColors.textColor)
                     }
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    if currentStep < 4 {
+                    if viewModel.currentStep != .time {
                         Button("Next") {
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                currentStep += 1
+                            if viewModel.canMoveToNextStep() {
+                                viewModel.moveToNextStep()
                             }
                         }
+                        .disabled(!viewModel.canMoveToNextStep())
                         .foregroundColor(ThemeColors.textColor)
                     } else {
                         Button("Submit") {
@@ -123,6 +100,15 @@ struct NewHangoutRequestView: View {
                     }
                 }
             }
+        }
+    }
+    
+    private var currentStepIndex: Int {
+        switch viewModel.currentStep {
+        case .persona: return 1
+        case .type: return 2
+        case .duration: return 3
+        case .time: return 4
         }
     }
     
