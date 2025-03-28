@@ -11,70 +11,96 @@ struct NewHangoutRequestView: View {
     private let steps = ["Persona", "Hangout Type", "Date"]
     
     var body: some View {
-        ZStack {
-            ThemeColors.backgroundGradient
-                .ignoresSafeArea()
-            
-            VStack(spacing: 0) {
-                // Progress Bar
-                VStack(spacing: 8) {
-                    HStack {
-                        ForEach(0..<steps.count, id: \.self) { index in
-                            VStack(spacing: 4) {
+        NavigationStack {
+            ZStack {
+                ThemeColors.backgroundGradient
+                    .ignoresSafeArea()
+                
+                VStack(spacing: 0) {
+                    // Progress Bar
+                    VStack(spacing: 4) {
+                        // Progress line
+                        GeometryReader { geometry in
+                            ZStack(alignment: .leading) {
+                                // Background line
+                                Rectangle()
+                                    .fill(ThemeColors.secondaryText)
+                                    .frame(height: 2)
+                                
+                                // Progress line
+                                Rectangle()
+                                    .fill(ThemeColors.textColor)
+                                    .frame(width: geometry.size.width * CGFloat(currentStep) / CGFloat(steps.count), height: 2)
+                            }
+                        }
+                        .frame(height: 2)
+                        
+                        // Step labels
+                        HStack {
+                            ForEach(0..<steps.count, id: \.self) { index in
                                 Text(steps[index])
                                     .font(.caption)
                                     .foregroundColor(index + 1 == currentStep ? ThemeColors.textColor : ThemeColors.secondaryText)
-                                
-                                Rectangle()
-                                    .fill(index + 1 <= currentStep ? ThemeColors.textColor : ThemeColors.secondaryText)
-                                    .frame(height: 2)
-                            }
-                            .frame(maxWidth: .infinity)
-                            
-                            if index < steps.count - 1 {
-                                Rectangle()
-                                    .fill(index + 1 < currentStep ? ThemeColors.textColor : ThemeColors.secondaryText)
-                                    .frame(height: 2)
+                                    .frame(maxWidth: .infinity)
                             }
                         }
+                        .padding(.horizontal)
                     }
-                    .padding(.horizontal)
                     .padding(.top)
-                }
-                .padding(.bottom, 20)
-                
-                ScrollView {
-                    VStack(spacing: 20) {
-                        switch currentStep {
-                        case 1:
-                            PersonaCarouselView(viewModel: viewModel)
-                                .onChange(of: viewModel.selectedPersona) { newValue in
-                                    if newValue != nil {
-                                        withAnimation {
-                                            currentStep = 2
+                    .padding(.bottom, 20)
+                    
+                    ScrollView {
+                        VStack(spacing: 20) {
+                            switch currentStep {
+                            case 1:
+                                PersonaCarouselView(viewModel: viewModel)
+                                    .onChange(of: viewModel.selectedPersona) { newValue in
+                                        if newValue != nil {
+                                            withAnimation {
+                                                currentStep = 2
+                                            }
                                         }
                                     }
-                                }
-                        case 2:
-                            DurationSelectionView(selectedDuration: $viewModel.selectedDuration)
-                        case 3:
-                            TimeSlotPickerView(viewModel: viewModel, selectedTime: $selectedTime)
-                        default:
-                            EmptyView()
+                            case 2:
+                                DurationSelectionView(selectedDuration: $viewModel.selectedDuration)
+                            case 3:
+                                TimeSlotPickerView(viewModel: viewModel, selectedTime: $selectedTime)
+                            default:
+                                EmptyView()
+                            }
                         }
+                        .padding()
                     }
-                    .padding()
                 }
             }
-        }
-        .navigationBarBackButtonHidden(true)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "chevron.left")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    if currentStep > 1 {
+                        Button("Back") {
+                            withAnimation {
+                                currentStep -= 1
+                            }
+                        }
                         .foregroundColor(ThemeColors.textColor)
+                    }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    if currentStep < 3 {
+                        Button("Next") {
+                            withAnimation {
+                                currentStep += 1
+                            }
+                        }
+                        .foregroundColor(ThemeColors.textColor)
+                    } else {
+                        Button("Submit") {
+                            submitRequest()
+                        }
+                        .disabled(selectedTime == nil)
+                        .foregroundColor(ThemeColors.textColor)
+                    }
                 }
             }
         }
